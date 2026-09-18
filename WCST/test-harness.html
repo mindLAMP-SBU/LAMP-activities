@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>WCST Test Harness</title>
+  <title>Sign Matching Test Harness</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f0f0; }
@@ -59,13 +59,13 @@
 <body>
   <script>
     window.HARNESS_CONFIG = {
-      title: 'WCST Test Harness',
+      title: 'Sign Matching Test Harness',
 
       getExtraConfig: function() {
         return {
           activity: {
             settings: {
-              deck_size: parseInt(document.getElementById('deck-select').value, 10),
+              total_questions: parseInt(document.getElementById('questions-input').value, 10) || 20,
               time_limit_per_trial_s: parseInt(document.getElementById('timelimit-input').value, 10) || 0,
             }
           }
@@ -75,27 +75,12 @@
       renderScores: function(s, data) {
         var html = '';
 
-        html += sectionTitle('Categories');
-        html += '<div class="score-grid">';
-        html += scoreCard('Categories Completed', s.categories_completed + ' / 6', true, true);
-        html += scoreCard('Trials to First Category', s.trials_to_first_category, true);
-        html += '</div>';
-
         html += sectionTitle('Performance');
         html += '<div class="score-grid">';
-        html += scoreCard('Accuracy', s.score + '%', true);
-        html += scoreCard('Total Trials', s.total_trials, false);
-        html += scoreCard('Total Correct', s.total_correct, true);
-        html += scoreCard('Total Errors', s.total_errors, true);
-        html += '</div>';
-
-        html += sectionTitle('Error Analysis');
-        html += '<div class="score-grid">';
-        html += scoreCard('Perseverative Responses', s.perseverative_responses, true, true);
-        html += scoreCard('Perseverative Errors', s.perseverative_errors, true);
-        html += scoreCard('Non-Perseverative Errors', s.non_perseverative_errors, true);
-        html += scoreCard('Conceptual Level', s.conceptual_level_responses, true);
-        html += scoreCard('Failure to Maintain Set', s.failure_to_maintain_set, true);
+        html += scoreCard('Score', s.score + '%', true, true);
+        html += scoreCard('Correct Answers', s.correct_answers + ' / ' + s.total_questions, true);
+        html += scoreCard('Total Questions', s.total_questions, false);
+        html += scoreCard('Signs in JSON', s.total_signs, false);
         html += '</div>';
 
         html += sectionTitle('Reaction Time');
@@ -116,17 +101,16 @@
             html += sectionTitle('Per-Trial Detail');
             html += '<table style="width:100%; border-collapse:collapse; font-size:11px;">';
             html += '<thead><tr style="color:#888; text-align:left; border-bottom:1px solid #444;">';
-            html += '<th style="padding:4px">#</th><th style="padding:4px">Card</th><th style="padding:4px">Rule</th><th style="padding:4px">Match</th><th style="padding:4px">Correct</th><th style="padding:4px">Persev</th><th style="padding:4px">RT</th>';
+            html += '<th style="padding:4px">#</th><th style="padding:4px">Type</th><th style="padding:4px">Prompt</th><th style="padding:4px">Chosen</th><th style="padding:4px">Correct</th><th style="padding:4px">RT</th>';
             html += '</tr></thead><tbody>';
             trials.forEach(function(t) {
               var color = t.correct ? '#4caf50' : '#e57373';
               html += '<tr style="border-bottom:1px solid #2a2a2a;">';
               html += '<td style="padding:4px; color:#666">' + t.trial_number + '</td>';
-              html += '<td style="padding:4px">' + t.card_number + ' ' + t.card_color + ' ' + t.card_shape + '</td>';
-              html += '<td style="padding:4px; color:#888">' + t.current_rule + '</td>';
-              html += '<td style="padding:4px; color:#888">' + t.match_dimension + '</td>';
+              html += '<td style="padding:4px; color:#888">' + t.prompt_type + '</td>';
+              html += '<td style="padding:4px">' + t.prompt + '</td>';
+              html += '<td style="padding:4px; color:#888">' + (t.chosen_answer || '\u2014') + '</td>';
               html += '<td style="padding:4px; color:' + color + '; font-weight:600;">' + (t.correct ? 'Y' : 'N') + '</td>';
-              html += '<td style="padding:4px; color:' + (t.perseverative_error ? '#e57373' : '#666') + '">' + (t.perseverative ? 'Y' : '') + '</td>';
               html += '<td style="padding:4px; color:#888;">' + t.rt_ms + 'ms</td>';
               html += '</tr>';
             });
@@ -149,7 +133,7 @@
 
   <div id="controls">
     <div class="row row-harness">
-      <strong>WCST Test Harness</strong>
+      <strong>Sign Matching Test Harness</strong>
       <label>Port:
         <select id="port-select">
           <option value="3000" selected>3000</option>
@@ -172,11 +156,8 @@
       <button class="btn-clear" onclick="clearData()">Clear</button>
     </div>
     <div class="row row-activity">
-      <label>Deck size:
-        <select id="deck-select">
-          <option value="64" selected>64 cards</option>
-          <option value="128">128 cards</option>
-        </select>
+      <label>Questions:
+        <input type="number" id="questions-input" value="20" min="1" max="100" style="width:50px">
       </label>
       <label>Time limit (s, 0=none):
         <input type="number" id="timelimit-input" value="0" min="0" max="120" style="width:50px">
