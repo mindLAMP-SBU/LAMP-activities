@@ -3,15 +3,16 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faArrowRight, faRedo } from "@fortawesome/free-solid-svg-icons";
 import { InstructionModal } from "./InstructionModal";
 import { Questionnaire } from "./Questionnaire";
+import { TrafficLight, LightState } from "./TrafficLight";
 import i18n from "../i18n";
 import "./SimpleRT.css";
 
 type Phase =
   | "instructions"
-  | "simple_waiting"     // ISI — blank screen, waiting for stimulus
-  | "simple_stimulus"    // stimulus visible, awaiting tap
-  | "simple_feedback"    // brief feedback after tap (or too-early)
-  | "choice_transition"  // overlay: "Now the circle will appear left or right"
+  | "simple_waiting"     // Green
+  | "simple_stimulus"    // Yellow
+  | "simple_feedback"    // Red
+  | "choice_transition"  // Overlay
   | "choice_waiting"
   | "choice_stimulus"
   | "choice_feedback"
@@ -91,6 +92,7 @@ const Board: React.FC<Props> = ({ data }) => {
 
   // ── Start a trial (show blank, schedule stimulus) ──────
   const startTrial = useCallback((phaseType: "simple" | "choice") => {
+    if (isiTimerRef.current) clearTimeout(isiTimerRef.current);
     respondedRef.current = false;
     const isi = randomISI(minISI, maxISI);
     currentISIRef.current = isi;
@@ -183,9 +185,7 @@ const Board: React.FC<Props> = ({ data }) => {
     setFeedbackText(i18n.t("TOO_EARLY"));
     setFeedbackColor("#e74c3c");
     setPhase(phaseType === "simple" ? "simple_feedback" : "choice_feedback");
-
-    setTimeout(() => advanceTrial(), 1000);
-  }, [stimulusSide, recordTrial, advanceTrial]);
+  }, [stimulusSide, recordTrial]);
 
   // ── Handle tap on stimulus (simple RT) ────────────────
   const handleSimpleTap = useCallback(() => {
@@ -215,9 +215,7 @@ const Board: React.FC<Props> = ({ data }) => {
       setFeedbackColor("#27AE60");
     }
     setPhase("simple_feedback");
-
-    setTimeout(() => advanceTrial(), 800);
-  }, [recordTrial, advanceTrial]);
+  }, [recordTrial]);
 
   // ── Handle tap on choice side ─────────────────────────
   const handleChoiceTap = useCallback((side: "left" | "right") => {
@@ -251,9 +249,7 @@ const Board: React.FC<Props> = ({ data }) => {
       setFeedbackColor("#27AE60");
     }
     setPhase("choice_feedback");
-
-    setTimeout(() => advanceTrial(), 800);
-  }, [stimulusSide, recordTrial, advanceTrial]);
+  }, [stimulusSide, recordTrial]);
 
   // ── Send results ──────────────────────────────────────
   const sendResult = useCallback((isNav: boolean, isBack: boolean, qData?: any) => {
@@ -340,6 +336,13 @@ const Board: React.FC<Props> = ({ data }) => {
     startTrial("simple");
   };
 
+  const handleNextTrial = () => {
+    // now a button instead of automatic
+    if (!respondedRef.current) return;
+    respondedRef.current = false;
+    advanceTrial();
+  };
+
   const handleChoiceTransitionReady = () => {
     trialCountInPhaseRef.current = 0;
     setTrialNum(0);
@@ -412,6 +415,13 @@ const Board: React.FC<Props> = ({ data }) => {
   const currentMax = isSimplePhase ? simpleTrials : choiceTrials;
   const phaseName = isSimplePhase ? i18n.t("SIMPLE_PHASE") : i18n.t("CHOICE_PHASE");
 
+  const simpleLight: LightState = isStimulus ? "yellow" : isFeedback ? "red" : "green";
+  const choiceLight = (side: "left" | "right"): LightState => {
+    if (isFeedback) return "red";
+    if (isStimulus && side === stimulusSide) return "yellow";
+    return "green";
+  };
+
   return (
     <div className="game-shell">
       {/* Header */}
@@ -461,19 +471,29 @@ const Board: React.FC<Props> = ({ data }) => {
           className="rt-area"
           onClick={isWaiting ? handleWaitingTap : undefined}
         >
-          {isWaiting && (
-            <div className="rt-prompt rt-wait">{i18n.t("WAIT")}</div>
-          )}
-          {isStimulus && (
-            <div className="rt-stimulus-container" onClick={handleSimpleTap}>
-              <div className="rt-circle rt-circle-center" />
+          <div
+            className="rt-stimulus-container"
+            onClick={isStimulus ? handleSimpleTap : undefined}
+          >
+            <div className="rt-light-stack">
+              <TrafficLight state={simpleLight} />
+              <div className="rt-light-footer">
+                {isWaiting && (
+                  <div className="rt-prompt rt-wait">{i18n.t("WAIT")}</div>
+                )}
+                {isFeedback && (
+                  <>
+                    <div className="rt-feedback" style={{ color: feedbackColor }}>
+                      {feedbackText}
+                    </div>
+                    <button className="rt-btn-next" onClick={handleNextTrial}>
+                      {i18n.t("NEXT")}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-          )}
-          {isFeedback && (
-            <div className="rt-feedback" style={{ color: feedbackColor }}>
-              {feedbackText}
-            </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -497,31 +517,31 @@ const Board: React.FC<Props> = ({ data }) => {
           className="rt-area"
           onClick={isWaiting ? handleWaitingTap : undefined}
         >
-          {isWaiting && (
-            <div className="rt-prompt rt-wait">{i18n.t("WAIT")}</div>
-          )}
-          {isStimulus && (
-            <div className="rt-choice-container">
-              <div
-                className={`rt-choice-half rt-choice-left${stimulusSide === "left" ? " rt-choice-active" : ""}`}
-                onClick={() => handleChoiceTap("left")}
-              >
-                {stimulusSide === "left" && <div className="rt-circle" />}
-                <span className="rt-choice-label">{i18n.t("TAP_LEFT")}</span>
-              </div>
-              <div className="rt-choice-divider" />
-              <div
-                className={`rt-choice-half rt-choice-right${stimulusSide === "right" ? " rt-choice-active" : ""}`}
-                onClick={() => handleChoiceTap("right")}
-              >
-                {stimulusSide === "right" && <div className="rt-circle" />}
-                <span className="rt-choice-label">{i18n.t("TAP_RIGHT")}</span>
-              </div>
+          <div className="rt-choice-container">
+            <div
+              className={`rt-choice-half rt-choice-left${isStimulus && stimulusSide === "left" ? " rt-choice-active" : ""}`}
+              onClick={isStimulus ? () => handleChoiceTap("left") : undefined}
+            >
+              <TrafficLight small state={choiceLight("left")} />
+              <span className="rt-choice-label">{i18n.t("TAP_LEFT")}</span>
             </div>
-          )}
+            <div className="rt-choice-divider" />
+            <div
+              className={`rt-choice-half rt-choice-right${isStimulus && stimulusSide === "right" ? " rt-choice-active" : ""}`}
+              onClick={isStimulus ? () => handleChoiceTap("right") : undefined}
+            >
+              <TrafficLight small state={choiceLight("right")} />
+              <span className="rt-choice-label">{i18n.t("TAP_RIGHT")}</span>
+            </div>
+          </div>
           {isFeedback && (
-            <div className="rt-feedback" style={{ color: feedbackColor }}>
-              {feedbackText}
+            <div className="rt-feedback-overlay">
+              <div className="rt-feedback" style={{ color: feedbackColor }}>
+                {feedbackText}
+              </div>
+              <button className="rt-btn-next" onClick={handleNextTrial}>
+                {i18n.t("NEXT")}
+              </button>
             </div>
           )}
         </div>

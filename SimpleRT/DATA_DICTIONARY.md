@@ -145,21 +145,21 @@ The final entry in `temporal_slices` is always:
 
 ### Phase 1 — Simple RT
 
-1. A blank screen displays "Wait..." with a pulsing animation
-2. After a random inter-stimulus interval (ISI, default 1000–4000ms), a blue circle appears in the center
+1. A traffic light is displayed with the green lamp lit
+2. After a random inter-stimulus interval (ISI, default 1000–4000ms), the light switches to yellow — the yellow onset starts the RT clock
 3. The participant taps anywhere on the screen as quickly as possible
-4. RT is displayed briefly (green if valid, red if anticipation)
-5. Next trial begins with a new random ISI
+4. The light switches to red and the RT is shown (green text if valid, red text if anticipation)
+5. The participant taps "Next" to start the following trial, which begins with a new random ISI
 6. Tapping during the ISI (before the stimulus) registers as an anticipation error
 
 ### Phase 2 — Choice RT
 
 1. A transition card explains the new rules; the participant taps "Ready" to begin
-2. A blank screen displays "Wait..."
-3. After a random ISI, a blue circle appears on either the left or right half of the screen
-4. The participant taps the matching side (left or right)
-5. RT is displayed briefly (green if correct, red if wrong side or anticipation)
-6. Next trial begins
+2. A traffic light is displayed in each half of the screen, both lit green
+3. After a random ISI, one of the two lights switches to yellow
+4. The participant taps the side whose light turned yellow
+5. Both lights switch to red and the RT is shown (green text if correct, red text if wrong side or anticipation)
+6. The participant taps "Next" to start the following trial
 
 ### Completion
 

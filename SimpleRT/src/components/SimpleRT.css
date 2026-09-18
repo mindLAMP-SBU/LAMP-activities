@@ -11,7 +11,7 @@
   color: #fff;
   font-size: 18px;
   font-weight: 600;
-  background: rgba(53, 159, 254, 1);
+  background: rgb(248, 74, 74);
   position: relative;
 }
 .back-link {
@@ -73,6 +73,7 @@
 /* ── Wait Prompt ────────────────────────────────────── */
 .rt-prompt {
   font-size: 28px;
+  line-height: 1.2;
   font-weight: 700;
   user-select: none;
 }
@@ -85,7 +86,7 @@
   50% { opacity: 1; }
 }
 
-/* ── Stimulus Circle ────────────────────────────────── */
+/* ── Traffic Light Stimulus ──────────────────────── */
 .rt-stimulus-container {
   flex: 1;
   display: flex;
@@ -94,26 +95,72 @@
   width: 100%;
 }
 
-.rt-circle {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: #359FFE;
-  box-shadow: 0 4px 24px rgba(53, 159, 254, 0.4);
-  animation: circle-appear 0.1s ease-out;
+.rt-light-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
 }
-.rt-circle-center {
-  /* no extra positioning needed */
+/* Fixed height (not min-height) so the housing never shifts when the caption
+   and the Next button swap in and out. */
+.rt-light-footer {
+  height: 116px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
 }
 
-@keyframes circle-appear {
-  0% { transform: scale(0.3); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+.rt-traffic-light {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 28px;
+  background: #2b2f36;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  user-select: none;
+}
+
+/* No transition or animation on the lamps: the yellow onset is the stimulus,
+   so it has to be instantaneous for the reaction time to be valid. */
+.rt-lamp {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+.rt-lamp-red.rt-lamp-on {
+  background: #e74c3c;
+  box-shadow: 0 0 26px 7px rgba(231, 76, 60, 0.55), inset 0 2px 5px rgba(255, 255, 255, 0.28);
+}
+.rt-lamp-yellow.rt-lamp-on {
+  background: #f5c518;
+  box-shadow: 0 0 30px 9px rgba(245, 197, 24, 0.6), inset 0 2px 5px rgba(255, 255, 255, 0.35);
+}
+.rt-lamp-green.rt-lamp-on {
+  background: #27AE60;
+  box-shadow: 0 0 26px 7px rgba(39, 174, 96, 0.5), inset 0 2px 5px rgba(255, 255, 255, 0.28);
+}
+
+/* Compact housing for the two-sided choice phase */
+.rt-traffic-light-small {
+  gap: 10px;
+  padding: 13px;
+  border-radius: 20px;
+}
+.rt-traffic-light-small .rt-lamp {
+  width: 58px;
+  height: 58px;
 }
 
 /* ── Feedback ───────────────────────────────────────── */
 .rt-feedback {
   font-size: 36px;
+  line-height: 1.2;
   font-weight: 800;
   user-select: none;
 }
@@ -135,7 +182,7 @@
   transition: background-color 0.1s;
 }
 .rt-choice-half:active {
-  background: rgba(53, 159, 254, 0.08);
+  background: rgba(0, 0, 0, 0.04);
 }
 .rt-choice-divider {
   width: 2px;
@@ -150,7 +197,23 @@
   letter-spacing: 1px;
 }
 .rt-choice-active .rt-choice-label {
-  color: #359FFE;
+  color: #8a6a00;
+}
+
+/* Feedback card floated over the two-sided choice layout */
+.rt-feedback-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 28px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.18);
 }
 
 /* ── Transition Card ────────────────────────────────── */
@@ -186,9 +249,27 @@
   background: #218BEA;
 }
 
+/* ── Next Trial Button ──────────────────────────────── */
+.rt-btn-next {
+  background: #2b2f36;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 40px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: background-color 0.15s;
+}
+.rt-btn-next:hover {
+  background: #3d434d;
+}
+
 /* ── Game Over Overlay ──────────────────────────────── */
 .rt-overlay-text {
-  background: rgba(53, 159, 254, 0.9);
+  background: rgb(248, 74, 74);
   color: #fff;
   padding: 14px 28px;
   border-radius: 12px;
@@ -199,7 +280,7 @@
 
 /* ── Instruction Modal ──────────────────────────────── */
 .instruction-modal-header {
-  background: rgba(53, 159, 254, 1);
+  background: rgb(248, 74, 74);
   color: #fff;
   border-bottom: none;
   padding: 16px 20px;
@@ -223,7 +304,7 @@
   padding: 8px 20px 20px;
 }
 .instruction-modal-btn {
-  background: rgba(53, 159, 254, 1);
+  background: rgb(248, 74, 74);
   border: none;
   border-radius: 8px;
   padding: 10px 48px;
@@ -232,12 +313,12 @@
   min-width: 140px;
 }
 .instruction-modal-btn:hover {
-  background: rgba(33, 139, 234, 1);
+  background: rgb(230, 60, 60);
 }
 
 /* ── Questionnaire Modal ────────────────────────────── */
 .questionnaire-modal-header {
-  background: rgba(53, 159, 254, 1);
+  background: rgb(248, 74, 74);
   color: #fff;
   border-bottom: none;
   padding: 16px 20px;
@@ -281,7 +362,7 @@
   padding: 8px 20px 20px;
 }
 .questionnaire-modal-btn {
-  background: rgba(53, 159, 254, 1);
+  background: rgb(248, 74, 74);
   border: none;
   border-radius: 8px;
   padding: 10px 48px;
@@ -290,7 +371,7 @@
   min-width: 140px;
 }
 .questionnaire-modal-btn:hover {
-  background: rgba(33, 139, 234, 1);
+  background: rgb(230, 60, 60);
 }
 .smileynav .btn {
   width: 71px;
@@ -301,8 +382,8 @@
   border: 0;
 }
 .smileynav .btn.active {
-  background-color: rgba(53, 159, 254, 1);
-  border: 2px solid rgba(53, 159, 254, 1);
+  background-color: rgb(248, 74, 74);
+  border: 2px solid rgb(248, 74, 74);
 }
 .smileynav .btn svg {
   width: 100%;
@@ -315,12 +396,29 @@
     font-size: 11px;
     padding: 3px 10px;
   }
-  .rt-circle {
-    width: 100px;
-    height: 100px;
+  .rt-traffic-light {
+    gap: 10px;
+    padding: 14px;
+    border-radius: 22px;
+  }
+  .rt-lamp {
+    width: 62px;
+    height: 62px;
+  }
+  .rt-traffic-light-small {
+    gap: 8px;
+    padding: 10px;
+  }
+  .rt-traffic-light-small .rt-lamp {
+    width: 44px;
+    height: 44px;
   }
   .rt-feedback {
     font-size: 28px;
+  }
+  .rt-light-footer {
+    height: 100px;
+    gap: 14px;
   }
   .smileynav .btn {
     width: 41px;
