@@ -1,15 +1,12 @@
 // src/components/Navbar.jsx
-import { AppBar, Toolbar, Box, IconButton, Typography } from "@mui/material";
+import { AppBar, Toolbar, Box, Typography } from "@mui/material";
 import logo from "../assets/logo.png";
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 export default function Navbar() {
 
-  const handleClick = () => {};
-
   return (
     <AppBar position="static" >
-      <Toolbar sx={{ display: "flex", alignItems: "center" }}>
+      <Toolbar sx={{ display: "flex", alignItems: "center", height: 70 }}>
 
         {/* left */}
         <Box component="img" src={logo} sx={{ width: 28, height: 28, borderRadius: 2, }} />
@@ -20,16 +17,9 @@ export default function Navbar() {
             Situational Modules
           </Typography>
         </Box>
-        <IconButton
-          aria-label="more"
-          id="long-button"
-          aria-controls={open ? 'long-menu' : undefined}
-          aria-expanded={open ? 'true' : undefined}
-          aria-haspopup="true"
-          onClick={handleClick}
-        >
-          <MoreVertIcon />
-        </IconButton>
+
+        {/* right (used for centering) */}
+        <Box sx={{ width: 28, height: 28 }} />
       </Toolbar>
     </AppBar>
   );

@@ -1,9 +1,10 @@
 import { Box, Button, IconButton, Paper, Typography} from "@mui/material"
 import { useState } from "react";
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import video1 from "../assets/video1.mp4";
 import video2 from "../assets/video2.mp4";
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
+import MultipleChoiceQuestion from "../components/MultipleChoiceQuestion";
+import CelebrationIcon from '@mui/icons-material/Celebration';
 
 const videoSources = [
   video1, 
@@ -42,27 +43,35 @@ export default function ModuleOne() {
     })
   }
 
+  const goHome = () => {
+    window.location.hash = "/"
+  }
+
   return (
     <Box display="flex" flexDirection="column" alignItems="center" >
         <Box display={"flex"} width="100%" alignItems={"center"}  pb={2}>
-          <IconButton onClick={() => (window.location.hash = "/")} >
+          <IconButton onClick={goHome} >
             <NavigateBeforeIcon />
           </IconButton>
+
           <Box sx={{ flexGrow: 1, display: "flex", justifyContent: "center"}} >
             {!finished && <Typography 
               color={"primary"} 
               fontWeight={"bold"} 
               align="center" 
-              sx={{ textDecoration: 'underline' }} 
+              sx={{ color: 'black' }} 
              
               fontSize={"h5.fontSize"}
             >
                 Watch this video
             </Typography>}
           </Box>
+
+          <Box  sx={{ width: 40, height: 40, borderRadius: 2, }} />
         </Box>
         {!finished && <Box
           component="video"
+          autoPlay={true}
           src={videoSources[questionNumber]}
           controls
           sx={{
@@ -70,7 +79,7 @@ export default function ModuleOne() {
             mx: "auto",    
             maxWidth: 800,
             width: "100%",
-            borderRadius: 2,
+            borderRadius: 3,
             pb: 2,
           }}
         />}
@@ -81,120 +90,41 @@ export default function ModuleOne() {
             maxWidth: 800,
           }}
         >
-          <Paper
+          <Box
             sx={{
-              background: "#fceaeb",
+              background: "white",
               p: 3,
             }}
           >
-            <Box display="flex" justifyContent="flex-end" alignItems={"center"}>
-              <Typography pr={2} sx={{ textDecoration: 'underline' }} >
-                Click to listen
-              </Typography>
-              <IconButton 
-                sx={{
-                  border: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <VolumeUpIcon />
-              </IconButton>
-            </Box>
-            {!finished && <MultipleChoiceQuestion question={questions[questionNumber]} options={options[questionNumber]} feedback={feedback[questionNumber]}
-             correctAnswer={correctAnswers[questionNumber]} questionNumber={questionNumber} incrementQuestion={incrementQuestion}/>}
-            {finished && (
-              <Typography fontWeight={"bold"} fontSize={"h6.fontSize"} align="center">
-                Great job! You've completed Module One.
-              </Typography>
-            )}
-          </Paper>
-        </Box>
-    </Box>
-  )
-}
-
-function MultipleChoiceQuestion({ question, options, feedback, correctAnswer, questionNumber, incrementQuestion }) {
-  const [selected, setSelected] = useState(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-
-  const handleOptionClick = (option) => {
-    setSelected(option);
-  }
-
-  const handleCheck = () => {
-    // logic to check the answer
-    setShowFeedback(true);
-  }
-
-  const handleHint = () => {
-    // logic to show hint
-  }
-
-  console.log(options.indexOf(selected) + 1, correctAnswer, "selected vs correct")
-  const isCorrect = correctAnswer == options.indexOf(selected) + 1;
-
-  return (
-    <Box>
-      <Typography fontWeight={"bold"}>
-        {question}
-      </Typography>
-      <Box display="flex" flexDirection="column" mt={2} gap={2}>
-        {!showFeedback && options.map((option) => (
-          <Paper
-            key={option}
-            onClick={() => handleOptionClick(option)}
-            sx={{
-              p: 2,
-              border: "1px solid",
-              borderColor: selected === option ? "primary.main" : "divider",
-              backgroundColor: selected === option ? "action.selected" : "inherit",
-              cursor: "pointer",
-              transition: "0.2s",
+            {!finished &&
+              <MultipleChoiceQuestion 
+                question={questions[questionNumber]} 
+                options={options[questionNumber]} 
+                feedback={feedback[questionNumber]}
+                correctAnswer={correctAnswers[questionNumber]} 
+                questionNumber={questionNumber} 
+                incrementQuestion={incrementQuestion}
+              />
+            }
             
-              '&:hover': {
-                backgroundColor: "action.hover",
-              }
-            }}
-          >
-            {option}
-          </Paper>
-        ))}
-        {showFeedback && (
-          <Typography color={isCorrect ? "success.main" : "error.main"}>
-            {feedback[options.indexOf(selected)]}
-          </Typography>
-        )}
-       <Box display="flex" gap={2} justifyContent={"center"}>
-          {!showFeedback && (
-              <>
-                <Button variant="contained" onClick={handleCheck}>
-                  Check
+            {finished && (
+              <Box display="flex" flexDirection={"column"} gap={6} alignItems={"center"}>
+                 <Typography fontWeight={"bold"} fontSize={"h5.fontSize"} align="center">
+                  Great job! You've completed Module One.
+                </Typography>
+                <CelebrationIcon
+                  sx={{
+                    width: "100px",
+                    height: "100px"
+                  }}
+                />
+                <Button variant="contained" onClick={goHome}>
+                  Go Back
                 </Button>
-                <Button variant="contained" onClick={handleHint}>
-                  Hint
-                </Button>
-              </>
-            )
-          }
-          {showFeedback && !isCorrect && (
-            <Button variant="contained" onClick={() => {
-              setSelected(null);
-              setShowFeedback(false);
-            }}>
-              Try Again
-            </Button>
-          )}
-          {showFeedback && isCorrect && (
-            <Button variant="contained" onClick={() => {
-              setSelected(null);
-              setShowFeedback(false);
-              incrementQuestion();
-            }}>
-              Next
-            </Button>
-          )}
-       </Box>
-      </Box>
+              </Box>
+            )}
+          </Box>
+        </Box>
     </Box>
   )
 }
