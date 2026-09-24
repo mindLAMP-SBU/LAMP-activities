@@ -1,7 +1,6 @@
 // src/app/AppLayout.jsx
 import { Box, Paper } from "@mui/material";
 import Navbar from "../components/Navbar";
-import { useState } from "react";
 
 export default function AppLayout({ children }) {
 
