@@ -81,7 +81,19 @@ export default function MultipleChoiceQuestion({ question, options, feedback, co
        <Box display="flex" marginTop={5} gap={2} justifyContent={"center"}>
           {!showFeedback && (
               <>
-                <Button variant="contained" onClick={handleCheck}>
+                <Button 
+                    disabled={selected === null} 
+                    variant="contained" 
+                    onClick={handleCheck}
+                    sx={{ 
+                        "&.Mui-disabled": { 
+                            background: "#cf6f72",
+                            color: "#ebe9e9",
+                            pointerEvents: 'unset', 
+                            cursor: 'not-allowed',  
+                        },
+                    }}
+                >
                   Check
                 </Button>
                 <Button variant="contained" onClick={handleHint}>
