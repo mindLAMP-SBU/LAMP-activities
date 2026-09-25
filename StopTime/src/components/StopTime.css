@@ -1,0 +1,425 @@
+/* ═══════════════════════════════════════════════════════
+   StopTime.css — All styles for the Stop Time activity
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Header ─────────────────────────────────────────── */
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  background: #D52027;
+  position: relative;
+}
+.back-link {
+  position: absolute; left: 0; top: 0;
+  height: 52px; display: flex; align-items: center;
+  padding: 0 16px; color: white; cursor: pointer; z-index: 10;
+}
+.home-link {
+  position: absolute; right: 0; top: 0;
+  height: 52px; display: flex; align-items: center;
+  padding: 0 16px; color: white; cursor: pointer; z-index: 10;
+}
+.home-link-forward {
+  position: absolute; right: 48px; top: 0;
+  height: 52px; display: flex; align-items: center;
+  padding: 0 16px; color: white; cursor: pointer; z-index: 10;
+}
+
+/* ── Status Bar ─────────────────────────────────────── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 16px;
+  min-height: 44px;
+  background: rgba(0, 0, 0, 0.08);
+}
+.level-badge {
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a2e;
+  padding: 4px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Game Shell ─────────────────────────────────────── */
+.game-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #f8f9fb;
+}
+
+/* ── Trial Area ─────────────────────────────────────── */
+.st-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 16px 24px;
+  min-height: 0;
+}
+.st-area-center {
+  justify-content: center;
+  gap: 18px;
+}
+
+/* ── Scene Stage ────────────────────────────────────── */
+.st-stage {
+  position: relative;
+  width: 100%;
+  /* Capped by viewport height as well as width, so on a short phone the scene
+     shrinks instead of pushing the buttons off the bottom. 55vh is the widest
+     the 5:4 stage can be before its height exceeds 44vh. */
+  max-width: min(520px, 55vh);
+  aspect-ratio: 500 / 400;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #EAF4FB;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.12);
+}
+.st-stage > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The hazard rolls up from the distance during the approach, then the cue
+   lands on it. Scaling from the road contact point keeps it on the tarmac. */
+.st-subject {
+  transform-box: view-box;
+  transform-origin: 250px 336px;
+  transition: transform 620ms cubic-bezier(0.22, 0.7, 0.3, 1), opacity 320ms ease-out;
+}
+.st-subject-far {
+  transform: scale(0.34) translateY(24px);
+  opacity: 0.75;
+}
+
+/* ── Lamp flashing ──────────────────────────────────── */
+/* Only the lit overlay carries this animation. The lens underneath is always
+   drawn, so a lamp never disappears from the bus while it is dark.
+   steps(1, end) keeps the blink hard-edged: real warning lamps snap on and off
+   rather than fading, and a fade would blur the moment of onset. */
+@keyframes st-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.st-flash-a { animation: st-blink 1s steps(1, end) infinite; }
+.st-flash-b { animation: st-blink 1s steps(1, end) infinite; animation-delay: 0.5s; }
+
+/* ── Traffic Signal Head ────────────────────────────── */
+/* The signal is SimpleRT's TrafficLight component, so it is DOM rather than
+   SVG and has to ride on top of the stage. Its transform mirrors
+   .st-subject-far exactly (origin 250,336 and a 24/400 nudge in viewBox
+   units) so it approaches in step with the pole drawn underneath it. */
+.st-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12%;
+  pointer-events: none;
+  transform-origin: 50% 84%;
+  transition: transform 620ms cubic-bezier(0.22, 0.7, 0.3, 1), opacity 320ms ease-out;
+}
+.st-overlay-far {
+  transform: scale(0.34) translateY(6%);
+  opacity: 0.75;
+}
+
+/* Sized as a share of the stage rather than in pixels, so the signal keeps
+   its proportions as the stage scales with the viewport. */
+/* Sized so the head hangs clear of the horizon rather than appearing to
+   rest on the road behind it. */
+.st-signal-head { width: 10.5%; }
+.st-signal-head .rt-traffic-light {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8%;
+  border-radius: 18%;
+  background: #2b2f36;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.st-signal-head .rt-lamp {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+.st-signal-head .rt-lamp + .rt-lamp { margin-top: 14%; }
+.st-signal-head .rt-lamp-red.rt-lamp-on {
+  background: #e74c3c;
+  box-shadow: 0 0 20px 6px rgba(231, 76, 60, 0.55), inset 0 2px 5px rgba(255, 255, 255, 0.28);
+}
+.st-signal-head .rt-lamp-yellow.rt-lamp-on {
+  background: #f5c518;
+  box-shadow: 0 0 22px 7px rgba(245, 197, 24, 0.6), inset 0 2px 5px rgba(255, 255, 255, 0.35);
+}
+.st-signal-head .rt-lamp-green.rt-lamp-on {
+  background: #27ae60;
+  box-shadow: 0 0 20px 6px rgba(39, 174, 96, 0.5), inset 0 2px 5px rgba(255, 255, 255, 0.28);
+}
+
+/* ── Prompt ─────────────────────────────────────────── */
+/* Fixed height so the buttons never shift as the prompt text swaps. */
+.st-prompt-row {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 8px;
+}
+.st-prompt {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1.2;
+  user-select: none;
+}
+.st-prompt-wait {
+  color: #9aa0a6;
+  font-size: 18px;
+  font-weight: 600;
+  animation: st-pulse 1.5s ease-in-out infinite;
+}
+@keyframes st-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.st-prompt-right { color: #1E8E4E; }
+.st-prompt-wrong { color: #C0392B; }
+
+/* ── Action Buttons ─────────────────────────────────── */
+.st-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 520px;
+}
+.st-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 3px solid transparent;
+  border-radius: 14px;
+  padding: 18px 6px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
+  transition: transform 0.08s ease, filter 0.15s ease, opacity 0.2s ease;
+}
+.st-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  filter: brightness(0.92);
+}
+.st-btn-continue { background: #1E8E4E; }
+.st-btn-slow     { background: #E8A200; color: #3d2a00; }
+.st-btn-stop     { background: #D52027; }
+
+/* Locked while the road is still coming into view. */
+.st-btn-locked {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* Feedback: outline the right answer, strike through a wrong pick. */
+.st-btn-answer {
+  border-color: #14532d;
+  opacity: 1;
+  box-shadow: 0 0 0 4px rgba(30, 142, 78, 0.28);
+}
+.st-btn-wrong {
+  border-color: #5c1a1a;
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+/* ── Next Button ────────────────────────────────────── */
+.st-next-row {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.st-btn-next {
+  background: #2b2f36;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 44px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: background-color 0.15s;
+}
+.st-btn-next:hover { background: #3d434d; }
+
+/* ── Game Over ──────────────────────────────────────── */
+.st-overlay-text {
+  background: #D52027;
+  color: #fff;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.st-final-score {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+/* ── Instruction Modal ──────────────────────────────── */
+.instruction-modal-header {
+  background: #D52027;
+  color: #fff;
+  border-bottom: none;
+  padding: 16px 20px;
+}
+.instruction-modal-title {
+  font-size: 22px;
+  font-weight: 600;
+  width: 100%;
+  text-align: center;
+}
+.instruction-modal-body {
+  padding: 24px 20px !important;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #333;
+  text-align: left;
+  /* The instructions list one rule per scenario, so keep the line breaks. */
+  white-space: pre-line;
+}
+.instruction-modal-footer {
+  border-top: none;
+  justify-content: center;
+  padding: 8px 20px 20px;
+}
+.instruction-modal-btn {
+  background: #D52027;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 48px;
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 140px;
+}
+.instruction-modal-btn:hover { background: #C01E23; }
+
+/* ── Questionnaire Modal ────────────────────────────── */
+.questionnaire-modal-header {
+  background: #D52027;
+  color: #fff;
+  border-bottom: none;
+  padding: 16px 20px;
+}
+.questionnaire-modal-header .btn-close {
+  filter: brightness(0) invert(1);
+  opacity: 0.8;
+}
+.questionnaire-modal-title {
+  font-size: 22px;
+  font-weight: 600;
+  width: 100%;
+  text-align: center;
+}
+.questionnaire-modal-body {
+  padding: 24px 20px !important;
+}
+.questionnaire-question {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.questionnaire-question:last-child { margin-bottom: 0; }
+.questionnaire-label {
+  font-size: 17px;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+.questionnaire-faces {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.questionnaire-modal-footer {
+  border-top: none;
+  justify-content: center;
+  padding: 8px 20px 20px;
+}
+.questionnaire-modal-btn {
+  background: #D52027;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 48px;
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 140px;
+}
+.questionnaire-modal-btn:hover { background: #C01E23; }
+.smileynav .btn {
+  width: 71px;
+  height: 71px;
+  border-radius: 50%;
+  padding: 3px;
+  background-color: #333;
+  border: 0;
+}
+.smileynav .btn.active {
+  background-color: #D52027;
+  border: 2px solid #D52027;
+}
+.smileynav .btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Mobile ─────────────────────────────────────────── */
+@media (max-width: 500px) {
+  .level-badge { font-size: 11px; padding: 3px 10px; }
+  .st-area { padding: 12px 10px 18px; gap: 10px; }
+  .st-prompt { font-size: 19px; }
+  .st-prompt-wait { font-size: 16px; }
+  .st-actions { gap: 7px; }
+  .st-btn {
+    font-size: 13px;
+    padding: 15px 2px;
+    border-radius: 12px;
+    letter-spacing: 0;
+  }
+  .st-btn-next { padding: 11px 32px; font-size: 15px; }
+  .st-next-row { height: 50px; }
+  .st-final-score { font-size: 20px; }
+  .smileynav .btn { width: 41px; height: 41px; }
+}
+
+/* Honour reduced-motion: the approach is decorative, but the lamp flashing is
+   part of the cue, so it is deliberately left running. */
+@media (prefers-reduced-motion: reduce) {
+  .st-subject, .st-overlay { transition: none; }
+  .st-prompt-wait { animation: none; opacity: 0.8; }
+}
