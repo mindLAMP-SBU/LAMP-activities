@@ -4,14 +4,17 @@ import CssBaseline from "@mui/material/CssBaseline";
 import theme from "../theme/theme";
 import AppLayout from "./AppLayout";
 import AppRoutes from "../routes/AppRoutes";
+import { ScoreProvider } from "../context/ScoreContext";
 
 export default function App() {
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AppLayout>
-        <AppRoutes />
-      </AppLayout>
+      <ScoreProvider>
+        <CssBaseline />
+        <AppLayout>
+          <AppRoutes />
+        </AppLayout>
+      </ScoreProvider>
     </ThemeProvider>
   );
 }

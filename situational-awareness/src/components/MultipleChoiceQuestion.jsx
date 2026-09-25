@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Box, Button, IconButton, Paper, Typography} from "@mui/material"
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import { ScoreContext } from "../context/ScoreContext";
 
 export default function MultipleChoiceQuestion({ question, options, feedback, correctAnswer, questionNumber, incrementQuestion }) {
   const [selected, setSelected] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const {score, setScore} = useContext(ScoreContext);
 
   const handleOptionClick = (option) => {
     setSelected(option);
@@ -13,6 +15,20 @@ export default function MultipleChoiceQuestion({ question, options, feedback, co
   const handleCheck = () => {
     // logic to check the answer
     setShowFeedback(true);
+
+    const isCorrect = correctAnswer == options.indexOf(selected) + 1;
+    if (isCorrect)
+    {
+        score.correctAnswers++;
+    }
+    else
+    {
+        score.incorrectAnswers++;
+    }
+    score.totalNumberOfAnswers++;
+    
+    // Update Context
+    setScore(score);
   }
 
   const handleHint = () => {
@@ -95,10 +111,7 @@ export default function MultipleChoiceQuestion({ question, options, feedback, co
                     }}
                 >
                   Check
-                </Button>
-                <Button variant="contained" onClick={handleHint}>
-                  Hint
-                </Button>
+                </Button>                
               </>
             )
           }
