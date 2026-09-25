@@ -11,7 +11,7 @@
   color: #fff;
   font-size: 18px;
   font-weight: 600;
-  background: rgb(248, 74, 74);
+  background: #D52027;
   position: relative;
 }
 .back-link {
@@ -269,7 +269,7 @@
 
 /* ── Game Over Overlay ──────────────────────────────── */
 .rt-overlay-text {
-  background: rgb(248, 74, 74);
+  background: #D52027;
   color: #fff;
   padding: 14px 28px;
   border-radius: 12px;
@@ -280,7 +280,7 @@
 
 /* ── Instruction Modal ──────────────────────────────── */
 .instruction-modal-header {
-  background: rgb(248, 74, 74);
+  background: #D52027;
   color: #fff;
   border-bottom: none;
   padding: 16px 20px;
@@ -304,7 +304,7 @@
   padding: 8px 20px 20px;
 }
 .instruction-modal-btn {
-  background: rgb(248, 74, 74);
+  background: #D52027;
   border: none;
   border-radius: 8px;
   padding: 10px 48px;
@@ -313,12 +313,12 @@
   min-width: 140px;
 }
 .instruction-modal-btn:hover {
-  background: rgb(230, 60, 60);
+  background: #C01E23;
 }
 
 /* ── Questionnaire Modal ────────────────────────────── */
 .questionnaire-modal-header {
-  background: rgb(248, 74, 74);
+  background: #D52027;
   color: #fff;
   border-bottom: none;
   padding: 16px 20px;
@@ -362,7 +362,7 @@
   padding: 8px 20px 20px;
 }
 .questionnaire-modal-btn {
-  background: rgb(248, 74, 74);
+  background: #D52027;
   border: none;
   border-radius: 8px;
   padding: 10px 48px;
@@ -371,7 +371,7 @@
   min-width: 140px;
 }
 .questionnaire-modal-btn:hover {
-  background: rgb(230, 60, 60);
+  background: #C01E23;
 }
 .smileynav .btn {
   width: 71px;
@@ -382,8 +382,8 @@
   border: 0;
 }
 .smileynav .btn.active {
-  background-color: rgb(248, 74, 74);
-  border: 2px solid rgb(248, 74, 74);
+  background-color: #D52027;
+  border: 2px solid #D52027;
 }
 .smileynav .btn svg {
   width: 100%;
