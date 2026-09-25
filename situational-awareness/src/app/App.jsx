@@ -1,0 +1,20 @@
+// src/app/App.jsx
+import { ThemeProvider } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
+import theme from "../theme/theme";
+import AppLayout from "./AppLayout";
+import AppRoutes from "../routes/AppRoutes";
+import { ScoreProvider } from "../context/ScoreContext";
+
+export default function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <ScoreProvider>
+        <CssBaseline />
+        <AppLayout>
+          <AppRoutes />
+        </AppLayout>
+      </ScoreProvider>
+    </ThemeProvider>
+  );
+}

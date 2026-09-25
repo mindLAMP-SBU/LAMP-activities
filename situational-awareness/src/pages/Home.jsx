@@ -1,0 +1,63 @@
+import { List, ListItem, ListItemAvatar, ListItemText, Avatar, IconButton, Box } from "@mui/material"
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useContext } from "react";
+import { ScoreContext } from "../context/ScoreContext";
+
+const modules = ["Module One", "Module Two", "Module Three", "Module Four", "Module Five"];
+
+export default function Home() {
+    const {score} = useContext(ScoreContext);
+
+    const handleClickBack = () => {
+        parent.postMessage(
+            JSON.stringify({
+                timestamp: Date.now(),
+                static_data: {
+                    correctAnswers: score.correctAnswers,
+                    incorrectAnswers: score.incorrectAnswers,
+                    totalAnswers: score.totalNumberOfAnswers,
+                    EndTime: new Date(),
+                },
+                clickBack: true,
+            }),
+            "*"
+        );
+    };
+
+    return (
+        <Box>
+            <IconButton onClick={handleClickBack}>
+                <ArrowBackIcon />
+            </IconButton>
+            <Box>
+                <List>
+                    {modules.map((module) => (
+                        <ModuleListItem key={module} title={module} link={`/${module.toLowerCase().replace(/\s/g, "-")}`} />
+                    ))}
+                </List>
+            </Box>
+        </Box>
+    )
+}
+
+function ModuleListItem({ title, link }) {
+    return (
+        <ListItem
+            secondaryAction={
+                <IconButton onClick={() => (window.location.hash = link)} edge="end" aria-label="delete">
+                    <NavigateNextIcon />
+                </IconButton>
+            }
+        >
+            <ListItemText
+                primary={title}
+                slotProps={{
+                    primary: {
+                        fontWeight: "bold",
+                    }
+                }}
+            />
+        </ListItem>
+    )
+}
