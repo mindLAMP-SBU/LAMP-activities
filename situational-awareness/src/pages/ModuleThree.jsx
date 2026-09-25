@@ -1,4 +1,4 @@
-import video5 from "../assets/video5.mov";
+import video5 from "../assets/video5.mp4";
 import ModuleTemplate from "./ModuleTemplate";
 
 const videoSources = [
@@ -8,7 +8,7 @@ const questions = [
   "You need to merge soon. What should you do next?",
 ]
 const options = [
-  ["Merge immediately", "Slow dramatically and wait near the end of the lane for traffic to disapear", "Focus only on the side mirror and merge when you no longer see the vehicle in the mirror", "Check the traffic around you, adjust your speed to create a safe opening, verify the space beside you is clear, and merge when there is a sufficient gap"],
+  ["Merge immediately", "Slow dramatically and wait near the endn of the lane for traffic to disapear", "Focus only on the side mirror and merge when you no longer see the vehicle in the mirror", "Check the traffic around you, adjust your speed to create a safe opening, verify the space beside you is clear, and merge when there is a sufficient gap"],
   ["Reduce speed and cover the brake", "Accelerate to clear the intersection quickly", "Swerve left to avoid the pedestrian", "Stop immediately in the intersection"]
 ]
 const feedback = [

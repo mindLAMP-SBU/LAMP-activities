@@ -16,7 +16,7 @@ const options = [
 ]
 const feedback = [
   [
-    "Stopping the vehicle is the safest response because the situation presents a high probability of a child entering the roadway suddenly.Children frequently chase toys or balls without looking for traffic. When a ball rolls into the road from behind parked cars, a child may appear with almost no warning, giving the driver very little reaction time.",
+    "Stopping the vehicle is the safest response because the situation presents a high probability of a child entering the roadway suddenly. Children frequently chase toys or balls without looking for traffic. When a ball rolls into the road from behind parked cars, a child may appear with almost no warning, giving the driver very little reaction time.",
     "Continuing to drive assumes the hazard is limited to the ball itself. However, the ball is actually a warning signal of a hidden pedestrian hazard.",
     "Switching lanes may seem like a quick way to avoid the ball, but it introduces additional dangers and unpredictability",
     "Slowing down is safer than continuing to drive, but it is not the safest response in this specific situation. Because the hazard suggests a child could enter the road immediately, slowing down may still leave the car moving toward the danger."
