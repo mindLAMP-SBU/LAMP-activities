@@ -95,12 +95,6 @@
       <label>Situations:
         <input type="number" id="trials" value="8" min="1" max="90">
       </label>
-      <label>Approach min (ms):
-        <input type="number" id="min-approach" value="800" min="300" max="5000" step="100">
-      </label>
-      <label>Approach max (ms):
-        <input type="number" id="max-approach" value="1600" min="300" max="8000" step="100">
-      </label>
       <label>Language:
         <select id="lang-select">
           <option value="en-US" selected>en-US</option>
@@ -151,8 +145,9 @@
     // The activity reads config from:
     //   - e.data.configuration.language
     //   - e.data.activity.settings.trials
-    //   - e.data.activity.settings.min_approach_ms
-    //   - e.data.activity.settings.max_approach_ms
+    //
+    // Everything else — categories, options, buttons and animation timing —
+    // comes from src/actions.json, which is bundled into the build.
     //   - e.data.noBack
     //   - e.data.forward
     // =================================================================
@@ -167,14 +162,7 @@
     function sendConfig() {
       var lang = document.getElementById('lang-select').value;
       var trials = parseInt(document.getElementById('trials').value, 10) || 8;
-      var minApproach = parseInt(document.getElementById('min-approach').value, 10) || 800;
-      var maxApproach = parseInt(document.getElementById('max-approach').value, 10) || 1600;
-
-      var settings = {
-        trials: trials,
-        min_approach_ms: minApproach,
-        max_approach_ms: maxApproach
-      };
+      var settings = { trials: trials };
       var config = {
         configuration: { language: lang },
         activity: { settings: settings },
@@ -183,7 +171,7 @@
         forward: true
       };
       getIframe().contentWindow.postMessage(config, '*');
-      log('Sent config: situations=' + trials + ', approach=' + minApproach + '-' + maxApproach + 'ms, lang=' + lang);
+      log('Sent config: situations=' + trials + ', lang=' + lang);
     }
 
     function reloadActivity() {
@@ -233,7 +221,7 @@
       if (data.duration !== undefined) html += scoreCard('Duration', (data.duration / 1000).toFixed(1) + 's', true);
       html += scoreCard('Done', data.done ? 'Yes' : (data.clickBack ? 'Back' : 'No'), false);
       html += scoreCard('Situations', s.trials, false);
-      html += scoreCard('Approach', s.min_approach_ms + '-' + s.max_approach_ms + ' ms', false);
+      html += scoreCard('Category', s.category || '---', false);
       html += '</div>';
 
       // Accuracy - the primary outcome for this activity
@@ -245,29 +233,23 @@
       html += scoreCard('Point', s.point, false);
       html += '</div>';
 
-      // By scenario
-      html += sectionTitle('By Scenario');
-      html += '<div class="score-grid">';
-      html += scoreCard('School Bus', s.bus_correct + ' / ' + s.bus_total, false);
-      html += scoreCard('Traffic Signal', s.light_correct + ' / ' + s.light_total, false);
-      html += scoreCard('Pedestrian', s.ped_correct + ' / ' + s.ped_total, false);
-      html += '</div>';
+      // Per-option breakdown, built from whatever actions.json contained.
+      if (s.by_option && Object.keys(s.by_option).length) {
+        html += sectionTitle('By Option');
+        html += '<div class="score-grid">';
+        Object.keys(s.by_option).sort().forEach(function(id) {
+          var row = s.by_option[id];
+          html += scoreCard(id, row.correct + ' / ' + row.total, false);
+        });
+        html += '</div>';
+      }
 
-      // By correct action
-      html += sectionTitle('By Correct Action');
-      html += '<div class="score-grid">';
-      html += scoreCard('Continue', s.continue_correct + ' / ' + s.continue_total, false);
-      html += scoreCard('Slow Down', s.slow_correct + ' / ' + s.slow_total, false);
-      html += scoreCard('Stop', s.stop_correct + ' / ' + s.stop_total, false);
-      html += '</div>';
-
-      // Where the wrong answers went. "stop > slow" means the situation
-      // called for a stop but only a slow down was chosen.
+      // Where the wrong answers went, keyed "<right button> > <chosen>".
       if (s.confusion_matrix && Object.keys(s.confusion_matrix).length) {
         html += sectionTitle('Confusions (correct &gt; chosen)');
         html += '<div class="score-grid">';
         Object.keys(s.confusion_matrix).forEach(function(k) {
-          html += scoreCard(k.replace('>', ' \u2192 '), s.confusion_matrix[k], false);
+          html += scoreCard(k.replace('>', ' → '), s.confusion_matrix[k], false);
         });
         html += '</div>';
       }
@@ -303,8 +285,8 @@
       var html = '<table style="width:100%; border-collapse:collapse; font-size:11px;">';
       html += '<thead><tr style="color:#888; text-align:left; border-bottom:1px solid #444;">';
       html += '<th style="padding:4px">#</th>';
-      html += '<th style="padding:4px">Scenario</th>';
-      html += '<th style="padding:4px">Cue</th>';
+      html += '<th style="padding:4px">Category</th>';
+      html += '<th style="padding:4px">Option</th>';
       html += '<th style="padding:4px">Correct</th>';
       html += '<th style="padding:4px">Chosen</th>';
       html += '<th style="padding:4px">Decision</th>';
@@ -321,8 +303,8 @@
         html += '<tr style="border-bottom:1px solid #2a2a2a;">';
         html += '<td style="padding:4px; color:#666;">' + (entry.item || i + 1) + '</td>';
         html += '<td style="padding:4px; color:#4fc3f7;">' + (entry.level || '---') + '</td>';
-        html += '<td style="padding:4px;">' + (entry.cue || '---') + '</td>';
-        html += '<td style="padding:4px; color:#888;">' + (entry.correct_action || '---') + '</td>';
+        html += '<td style="padding:4px;">' + (entry.option || '---') + '</td>';
+        html += '<td style="padding:4px; color:#888;">' + (entry.correct_answer || '---') + '</td>';
         html += '<td style="padding:4px; color:' + (isCorrect ? '#4caf50' : '#e57373') + ';">' + (entry.value || '---') + '</td>';
         html += '<td style="padding:4px; font-weight:700;">' + entry.duration + 'ms</td>';
         html += '<td style="padding:4px; color:' + (isCorrect ? '#4caf50' : '#e57373') + ';">' + (isCorrect ? '\u2713' : '\u2717') + '</td>';

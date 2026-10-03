@@ -1,5 +1,5 @@
 import React from "react";
-import { ROAD_CENTER, roadHalfWidth } from "./SceneStage";
+import { ROAD_CENTER, roadHalfWidth } from "./roadGeometry";
 
 /**
  * A marked crossing with someone beside it.

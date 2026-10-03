@@ -1,0 +1,136 @@
+[
+    {
+        "category": "Vehicles",
+        "options": [
+            {
+                "id": "bus_driving",
+                "display": "Bus (Driving)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green", "correct": true },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red" }
+                ],
+                "animations": [
+                    "0 Asset SchoolBus Load Zoom",
+                    "2 End"
+                ]
+            },
+            {
+                "id": "bus_amber",
+                "display": "Bus (Amber Lights)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow", "correct": true },
+                    { "text": "Stop", "color": "Red" }
+                ],
+                "animations": [
+                    "0 Asset SchoolBus Load Zoom",
+                    "1 Asset SchoolBus Animate amber",
+                    "2 End"
+                ]
+            },
+            {
+                "id": "bus_stopping",
+                "display": "Bus (Stopping)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red", "correct": true }
+                ],
+                "animations": [
+                    "0 Asset SchoolBus Load Zoom",
+                    "1 Asset SchoolBus Animate amber",
+                    "2.5 Asset SchoolBus Animate sign",
+                    "4 End"
+                ]
+            }
+        ]
+    },
+    {
+        "category": "Signals",
+        "options": [
+            {
+                "id": "light_green",
+                "display": "Traffic Light (Green)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green", "correct": true },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red" }
+                ],
+                "animations": [
+                    "0 Asset TrafficSignal Load Zoom",
+                    "2 End"
+                ]
+            },
+            {
+                "id": "light_yellow",
+                "display": "Traffic Light (Yellow)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red", "correct": true }
+                ],
+                "animations": [
+                    "0 Asset TrafficSignal Load Zoom",
+                    "1 Asset TrafficSignal Animate yellow",
+                    "2 End"
+                ]
+            },
+            {
+                "id": "light_red",
+                "display": "Traffic Light (Red)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red", "correct": true }
+                ],
+                "animations": [
+                    "0 Asset TrafficSignal Load Zoom",
+                    "1 Asset TrafficSignal Animate yellow",
+                    "2 Asset TrafficSignal Animate red",
+                    "3 End"
+                ]
+            }
+        ]
+    },
+    {
+        "category": "Pedestrians",
+        "options": [
+            {
+                "id": "ped_waiting",
+                "display": "Pedestrian (Waiting)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow", "correct": true },
+                    { "text": "Stop", "color": "Red" }
+                ],
+                "animations": [
+                    "0 Asset Pedestrian Load Zoom",
+                    "1 End"
+                ]
+            },
+            {
+                "id": "ped_crossing",
+                "display": "Pedestrian (Crossing)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red", "correct": true }
+                ],
+                "animations": [
+                    "0 Asset Pedestrian Load Zoom",
+                    "1 Asset Pedestrian Animate crossing",
+                    "2 End"
+                ]
+            }
+        ]
+    }
+]

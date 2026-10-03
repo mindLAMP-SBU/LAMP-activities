@@ -1,41 +1,14 @@
 import React from "react";
+import { HORIZON, ROAD_BOTTOM, depthToY, roadBand, roadHalfWidth } from "./roadGeometry";
 
 /**
- * The shared backdrop every scenario is drawn onto.
+ * The "road-normal" scene: an ordinary two-way road running away from the
+ * viewer, with sky, verge and lane markings. Assets are drawn into it.
  *
- * The road recedes away from the viewer toward a vanishing point on the
- * horizon, because the participant is sitting behind the wheel looking down
- * the road at whatever is ahead of them. Everything else in a scene is
- * positioned against the helpers exported here, so a crosswalk or a signal
- * pole lands on the tarmac at the right width for its depth.
+ * A scene owns only the backdrop. It takes the assets' SVG as `children` and
+ * their DOM layers as `overlay`, and knows nothing about which assets those
+ * are, so any scene can host any asset.
  */
-
-export const HORIZON = 200;
-export const ROAD_BOTTOM = 400;
-export const ROAD_CENTER = 250;
-
-/** Half-width of the carriageway at a given screen y, in viewBox units. */
-export const roadHalfWidth = (y: number): number =>
-  14 + ((y - HORIZON) / (ROAD_BOTTOM - HORIZON)) * 240;
-
-/** Maps a 0..1 depth (0 = at the horizon, 1 = at the viewer) to a screen y. */
-export const depthToY = (u: number): number =>
-  HORIZON + (ROAD_BOTTOM - HORIZON) * Math.pow(u, 1.9);
-
-/** A band across the road between two depths, as an SVG points string. */
-export const roadBand = (
-  yFar: number,
-  yNear: number,
-  halfAt: (y: number) => number = roadHalfWidth
-): string =>
-  [
-    [ROAD_CENTER - halfAt(yFar), yFar],
-    [ROAD_CENTER + halfAt(yFar), yFar],
-    [ROAD_CENTER + halfAt(yNear), yNear],
-    [ROAD_CENTER - halfAt(yNear), yNear],
-  ]
-    .map((p) => p.join(","))
-    .join(" ");
 
 const edgeInset = (y: number) => roadHalfWidth(y) - roadHalfWidth(y) * 0.05;
 const dashHalf = (y: number) => roadHalfWidth(y) * 0.035;
@@ -47,16 +20,15 @@ const DASHES = Array.from({ length: 6 }, (_, i) => {
   return [depthToY(a), depthToY(a + 0.09)] as const;
 });
 
-interface Props {
-  children: React.ReactNode;
-  label: string;
-  /** DOM overlay drawn on top of the SVG, used for the traffic signal head. */
+export interface SceneProps {
+  /** Asset SVG, drawn inside the scene's own viewBox. */
+  children?: React.ReactNode;
+  /** Asset DOM layers, drawn over the stage. */
   overlay?: React.ReactNode;
-  /** True while the scene is still in the distance, before the cue lands. */
-  approaching?: boolean;
+  label: string;
 }
 
-export const SceneStage: React.FC<Props> = ({ children, label, overlay, approaching }) => (
+export const RoadNormal: React.FC<SceneProps> = ({ children, overlay, label }) => (
   <div className="st-stage">
     <svg viewBox="0 0 500 400" width="100%" height="100%" role="img" aria-label={label}>
       <defs>
@@ -87,8 +59,6 @@ export const SceneStage: React.FC<Props> = ({ children, label, overlay, approach
       {children}
     </svg>
 
-    {overlay && (
-      <div className={"st-overlay" + (approaching ? " st-overlay-far" : "")}>{overlay}</div>
-    )}
+    {overlay && <div className="st-overlay">{overlay}</div>}
   </div>
 );
