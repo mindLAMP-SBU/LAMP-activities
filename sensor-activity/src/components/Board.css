@@ -1,0 +1,181 @@
+/* ═══════════════════════════════════════════════════════
+   Gyroscope.css
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Header ─────────────────────────────────────────── */
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  background: #D52027;
+  position: relative;
+}
+.back-link {
+  position: absolute; left: 0; top: 0;
+  height: 52px; display: flex; align-items: center;
+  padding: 0 16px; color: white; cursor: pointer; z-index: 10;
+}
+.home-link {
+  position: absolute; right: 0; top: 0;
+  height: 52px; display: flex; align-items: center;
+  padding: 0 16px; color: white; cursor: pointer; z-index: 10;
+}
+.home-link-forward {
+  position: absolute; right: 48px; top: 0;
+  height: 52px; display: flex; align-items: center;
+  padding: 0 16px; color: white; cursor: pointer; z-index: 10;
+}
+
+/* ── Game Shell ─────────────────────────────────────── */
+.game-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #f0f2f5;
+}
+
+/* ── Play Area ──────────────────────────────────────── */
+/* The activity's own UI goes in here. */
+.activity-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 12px 8px;
+  gap: 12px;
+  position: relative;
+  width: 100%;
+}
+
+/* ── Overlay Text (game over, messages) ─────────────── */
+.activity-overlay-text {
+  background: rgba(213, 32, 39, 0.9);
+  color: #fff;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* ── Instruction Modal ────────────────────────────── */
+.instruction-modal-header {
+  background: #D52027;
+  color: #fff;
+  border-bottom: none;
+  padding: 16px 20px;
+}
+.instruction-modal-title {
+  font-size: 22px;
+  font-weight: 600;
+  width: 100%;
+  text-align: center;
+}
+.instruction-modal-body {
+  padding: 24px 20px !important;
+  font-size: 18px;
+  line-height: 1.6;
+  color: #333;
+  text-align: center;
+}
+.instruction-modal-footer {
+  border-top: none;
+  justify-content: center;
+  padding: 8px 20px 20px;
+}
+.instruction-modal-btn {
+  background: #D52027;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 48px;
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 140px;
+}
+.instruction-modal-btn:hover {
+  background: #B01A20;
+}
+
+/* ── Questionnaire Modal ──────────────────────────── */
+.questionnaire-modal-header {
+  background: #D52027;
+  color: #fff;
+  border-bottom: none;
+  padding: 16px 20px;
+}
+.questionnaire-modal-title {
+  font-size: 22px;
+  font-weight: 600;
+  width: 100%;
+  text-align: center;
+}
+.questionnaire-modal-body {
+  padding: 24px 20px !important;
+}
+.questionnaire-question {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.questionnaire-question:last-child {
+  margin-bottom: 0;
+}
+.questionnaire-label {
+  font-size: 17px;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+.questionnaire-faces {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.questionnaire-modal-footer {
+  border-top: none;
+  justify-content: center;
+  padding: 8px 20px 20px;
+}
+.questionnaire-modal-btn {
+  background: #D52027;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 48px;
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 140px;
+}
+.questionnaire-modal-btn:hover {
+  background: #B01A20;
+}
+.smileynav .btn {
+  width: 71px;
+  height: 71px;
+  border-radius: 50%;
+  padding: 3px;
+  background-color: #333;
+  border: 0;
+}
+.smileynav .btn.active {
+  background-color: #D52027;
+  border: 2px solid rgba(53, 159, 254, 1);
+}
+.smileynav .btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Mobile ─────────────────────────────────────────── */
+@media (max-width: 500px) {
+  .smileynav .btn {
+    width: 41px;
+    height: 41px;
+  }
+}
