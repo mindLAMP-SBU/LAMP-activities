@@ -19,10 +19,21 @@ interface Props {
 }
 
 const Board: React.FC<Props> = ({ data }) => {
-  const settings = data.activity?.settings ?? data.settings ?? {};
+  const dataItems = useRef<any[]>([]);
+  const settings = useRef<any | null>(null);
+
+  // first message contains configuration
+  if (settings.current == null)
+  {
+    settings.current = data.activity?.settings ?? data.settings ?? {};
+  }
+  // remaining messages contain sensor data
+  {
+    dataItems.current.push(data)
+  }
 
   const language =
-    settings.language ?? data.configuration?.language ?? data.language ?? "en-US";
+    settings.current.language ?? data.configuration?.language ?? data.language ?? "en-US";
 
   // state
   const [phase, setPhase] = useState<Phase>("instructions");
@@ -110,11 +121,15 @@ const Board: React.FC<Props> = ({ data }) => {
         />
       )}
 
-      {/* Playing — the activity's own UI goes here. The placeholder below
-          ends the activity on a tap so the full flow stays testable. */}
+      {/* Playing — the activity's own UI goes here. */}
       {phase === "playing" && (
         <div className="activity-area"> 
-        <h1>Hello World</h1>
+        <h1>Data</h1>
+        {
+          dataItems.current.map((item: any, index: number) => {
+            return <p key={index}>{JSON.stringify(item)}</p>;
+          })
+        }
         </div>
       )}
 
