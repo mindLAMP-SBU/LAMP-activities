@@ -8,9 +8,10 @@ import {
 import { InstructionModal } from "./InstructionModal";
 import { Questionnaire } from "./Questionnaire";
 import { SensorReadout } from "./SensorReadout";
-import useDeviceMotion from "../hooks/useDeviceMotion";
+import useDeviceMotion, { MotionSample } from "../hooks/useDeviceMotion";
 import i18n from "../i18n";
 import "./Board.css";
+import Arrow from "src/icons/Arrow";
 
 
 // Activity-specific phases go between "playing" and "questionnaire".
@@ -37,11 +38,28 @@ const Board: React.FC<Props> = ({ data }) => {
   // state
   const [phase, setPhase] = useState<Phase>("instructions");
 
-  // Only listen while the readout is on screen.
-  const motion = useDeviceMotion({ enabled: phase === "playing" });
-
   // refs
   const startedAtRef = useRef(0);
+  const theta = useRef(0);
+  const lastSampleAtRef = useRef(0);
+
+  // use rotation rate gamma to update the angle theta
+  const integrateGamma = useCallback((s: MotionSample) => {
+    const gamma = s.rotationRate.gamma;
+    const prevT = lastSampleAtRef.current;
+    // Prefer the device-reported interval; fall back to the sample gap.
+    const dt = s.interval !== null ? s.interval : prevT > 0 ? s.t - prevT : 0;
+    lastSampleAtRef.current = s.t;
+    if (gamma === null || dt <= 0) return;
+    // Wrap so a long session can't drift off into float noise.
+    theta.current = (((theta.current + (gamma * dt) / 1000) % 360) + 360) % 360;
+  }, []);
+
+  // Only listen while the readout is on screen.
+  const motion = useDeviceMotion({
+    enabled: phase === "playing",
+    onSample: integrateGamma,
+  });
 
   // localization
   useEffect(() => {
@@ -56,9 +74,7 @@ const Board: React.FC<Props> = ({ data }) => {
     );
   }, []);
 
-  // iOS 13+ requires requestPermission() to be reached synchronously from a
-  // user gesture -- do not make this async or await anything before the call,
-  // or Safari resolves "denied" without ever showing the prompt.
+  // iOS 13+ requires requestPermission() to be reached synchronously from a user gesture
   const handleInstructionClose = useCallback(() => {
     startedAtRef.current = Date.now();
     motion.requestPermission();
@@ -130,6 +146,7 @@ const Board: React.FC<Props> = ({ data }) => {
       {/* Playing — the activity's own UI goes here. */}
       {phase === "playing" && (
         <div className="activity-area">
+          <Arrow theta={theta.current}/>
           <SensorReadout motion={motion} />
           <button className="sensor-btn" onClick={finishActivity}>
             {i18n.t("Done")}

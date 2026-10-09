@@ -43,6 +43,8 @@ export interface UseDeviceMotionOptions {
   uiIntervalMs?: number;
   /** Rolling buffer length. Default 50 samples (~1s at 50 Hz). */
   bufferSize?: number;
+  /** Called for every event, before any throttling. Use this for anything that must see the whole stream. */
+  onSample?: (sample: MotionSample) => void;
 }
 
 export interface DeviceMotionState {
@@ -140,7 +142,12 @@ const EMPTY_SNAPSHOT: Snapshot = {
 export function useDeviceMotion(
   options: UseDeviceMotionOptions = {}
 ): DeviceMotionState {
-  const { enabled = true, uiIntervalMs = 100, bufferSize = 50 } = options;
+  const { enabled = true, uiIntervalMs = 100, bufferSize = 50, onSample } = options;
+
+  // Held in a ref so a caller passing an inline closure does not re-subscribe
+  // the listener on every render.
+  const onSampleRef = useRef(onSample);
+  onSampleRef.current = onSample;
 
   const needsPermission = detectNeedsPermission();
 
@@ -171,6 +178,9 @@ export function useDeviceMotion(
         rotationRate: toRotation(event.rotationRate),
         interval: num(event.interval),
       };
+      if (onSampleRef.current) {
+        onSampleRef.current(sample);
+      }
       latestRef.current = sample;
       countRef.current += 1;
       if (!hasDataRef.current && sampleHasData(sample)) {
@@ -211,7 +221,6 @@ export function useDeviceMotion(
   // --- throttled publish into React -------------------------------------
   useEffect(() => {
     if (!listening) return undefined;
-
     const id = window.setInterval(() => {
       const now = Date.now();
       const elapsed = now - tickAtRef.current;
@@ -243,18 +252,12 @@ export function useDeviceMotion(
     };
   }, [listening, uiIntervalMs]);
 
-  // --- iOS 13+ permission ------------------------------------------------
+  // iOS 13+ permission 
   const requestPermission = useCallback((): Promise<MotionPermission> => {
     if (!DME) {
       setPermission("unsupported");
       return Promise.resolve<MotionPermission>("unsupported");
     }
-
-    // `devicemotion` is gated by DeviceMotionEvent.requestPermission.
-    // DeviceOrientationEvent.requestPermission is kept only as a fallback for
-    // UAs that shipped one and not the other.
-    // .bind is required: these are static methods and an unbound reference
-    // loses `this` ("Illegal invocation") in some engines.
     const request: null | (() => Promise<string>) =
       typeof DME.requestPermission === "function"
         ? DME.requestPermission.bind(DME)
