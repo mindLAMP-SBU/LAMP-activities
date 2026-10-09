@@ -14,6 +14,9 @@ import "./Board.css";
 import Arrow from "src/icons/Arrow";
 
 
+/** Largest gap between samples still treated as continuous motion, in ms. */
+const MAX_STEP_MS = 250;
+
 // Activity-specific phases go between "playing" and "questionnaire".
 type Phase = "instructions" | "playing" | "questionnaire" | "done";
 
@@ -23,10 +26,6 @@ interface Props {
 
 const Board: React.FC<Props> = ({ data }) => {
   const settings = useRef<any | null>(null);
-
-  // The dashboard posts exactly one message, on iframe load. There is no
-  // sensor channel -- accelerometer data comes from the browser `devicemotion`
-  // event, not from postMessage.
   if (settings.current == null)
   {
     settings.current = data.activity?.settings ?? data.settings ?? {};
@@ -42,15 +41,25 @@ const Board: React.FC<Props> = ({ data }) => {
   const startedAtRef = useRef(0);
   const theta = useRef(0);
   const lastSampleAtRef = useRef(0);
+  // Diagnostics: how many samples reached the integrator, and how many of
+  // those actually moved theta. Rendered below the arrow.
+  const seenRef = useRef(0);
+  const appliedRef = useRef(0);
+  const lastDtRef = useRef(0);
 
-  // use rotation rate gamma to update the angle theta
+  // use rotation rate to update the angle theta
   const integrateGamma = useCallback((s: MotionSample) => {
     const gamma = s.rotationRate.gamma;
     const prevT = lastSampleAtRef.current;
-    // Prefer the device-reported interval; fall back to the sample gap.
-    const dt = s.interval !== null ? s.interval : prevT > 0 ? s.t - prevT : 0;
     lastSampleAtRef.current = s.t;
+    seenRef.current += 1;
+
+    let dt = prevT > 0 ? s.t - prevT : s.interval !== null ? s.interval : 0;
+    if (dt > MAX_STEP_MS) dt = 0;
+
+    lastDtRef.current = dt;
     if (gamma === null || dt <= 0) return;
+    appliedRef.current += 1;
     // Wrap so a long session can't drift off into float noise.
     theta.current = (((theta.current + (gamma * dt) / 1000) % 360) + 360) % 360;
   }, []);
@@ -146,7 +155,27 @@ const Board: React.FC<Props> = ({ data }) => {
       {/* Playing — the activity's own UI goes here. */}
       {phase === "playing" && (
         <div className="activity-area">
-          <Arrow theta={theta.current}/>
+          <Arrow theta={theta.current} />
+          <div className="sensor-card sensor-stats">
+            <div className="sensor-stat">
+              <div className="sensor-stat-label">Theta</div>
+              <div className="sensor-stat-value">
+                {theta.current.toFixed(1)}
+              </div>
+            </div>
+            <div className="sensor-stat">
+              <div className="sensor-stat-label">Seen / Applied</div>
+              <div className="sensor-stat-value">
+                {seenRef.current} / {appliedRef.current}
+              </div>
+            </div>
+            <div className="sensor-stat">
+              <div className="sensor-stat-label">Last dt</div>
+              <div className="sensor-stat-value">
+                {lastDtRef.current.toFixed(1)} ms
+              </div>
+            </div>
+          </div>
           <SensorReadout motion={motion} />
           <button className="sensor-btn" onClick={finishActivity}>
             {i18n.t("Done")}

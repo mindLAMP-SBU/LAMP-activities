@@ -32,7 +32,7 @@ export interface MotionSample {
   accelerationIncludingGravity: Vector3;
   /** deg/s. */
   rotationRate: Rotation3;
-  /** Device-reported sampling interval, in ms. */
+  /** Device-reported sampling interval, normalised to ms (see toIntervalMs). */
   interval: number | null;
 }
 
@@ -93,6 +93,17 @@ function detectNeedsPermission(): boolean {
 function num(v: number | null | undefined): number | null {
   // typeof guard first: isFinite(null) is true, because Number(null) === 0.
   return typeof v === "number" && isFinite(v) ? v : null;
+}
+
+/**
+ * The spec says `interval` is in milliseconds, but iOS reports it in seconds
+ * (~0.016). A sub-millisecond interval would mean a >1000Hz sensor, which no
+ * browser delivers, so treat anything under 1 as seconds and normalise to ms.
+ */
+function toIntervalMs(v: number | null | undefined): number | null {
+  const n = num(v);
+  if (n === null || n <= 0) return n;
+  return n < 1 ? n * 1000 : n;
 }
 
 function toVector(v: DeviceMotionEventAcceleration | null | undefined): Vector3 {
@@ -176,7 +187,7 @@ export function useDeviceMotion(
           event.accelerationIncludingGravity
         ),
         rotationRate: toRotation(event.rotationRate),
-        interval: num(event.interval),
+        interval: toIntervalMs(event.interval),
       };
       if (onSampleRef.current) {
         onSampleRef.current(sample);
