@@ -7,6 +7,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { InstructionModal } from "./InstructionModal";
 import { Questionnaire } from "./Questionnaire";
+import { SensorReadout } from "./SensorReadout";
+import useDeviceMotion from "../hooks/useDeviceMotion";
 import i18n from "../i18n";
 import "./Board.css";
 
@@ -19,17 +21,14 @@ interface Props {
 }
 
 const Board: React.FC<Props> = ({ data }) => {
-  const dataItems = useRef<any[]>([]);
   const settings = useRef<any | null>(null);
 
-  // first message contains configuration
+  // The dashboard posts exactly one message, on iframe load. There is no
+  // sensor channel -- accelerometer data comes from the browser `devicemotion`
+  // event, not from postMessage.
   if (settings.current == null)
   {
     settings.current = data.activity?.settings ?? data.settings ?? {};
-  }
-  // remaining messages contain sensor data
-  {
-    dataItems.current.push(data)
   }
 
   const language =
@@ -37,6 +36,9 @@ const Board: React.FC<Props> = ({ data }) => {
 
   // state
   const [phase, setPhase] = useState<Phase>("instructions");
+
+  // Only listen while the readout is on screen.
+  const motion = useDeviceMotion({ enabled: phase === "playing" });
 
   // refs
   const startedAtRef = useRef(0);
@@ -54,10 +56,14 @@ const Board: React.FC<Props> = ({ data }) => {
     );
   }, []);
 
+  // iOS 13+ requires requestPermission() to be reached synchronously from a
+  // user gesture -- do not make this async or await anything before the call,
+  // or Safari resolves "denied" without ever showing the prompt.
   const handleInstructionClose = useCallback(() => {
     startedAtRef.current = Date.now();
+    motion.requestPermission();
     setPhase("playing");
-  }, []);
+  }, [motion.requestPermission]);
 
   // called when activity is done
   const finishActivity = useCallback(() => {
@@ -123,13 +129,11 @@ const Board: React.FC<Props> = ({ data }) => {
 
       {/* Playing — the activity's own UI goes here. */}
       {phase === "playing" && (
-        <div className="activity-area"> 
-        <h1>Data</h1>
-        {
-          dataItems.current.map((item: any, index: number) => {
-            return <p key={index}>{JSON.stringify(item)}</p>;
-          })
-        }
+        <div className="activity-area">
+          <SensorReadout motion={motion} />
+          <button className="sensor-btn" onClick={finishActivity}>
+            {i18n.t("Done")}
+          </button>
         </div>
       )}
 

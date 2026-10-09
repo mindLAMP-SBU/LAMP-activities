@@ -8,8 +8,22 @@ const resources = {
   "en-US": {
     translation: {
       GAME: "Sensor Activity",
-      INSTRUCTIONS: "Instructions go here.",
+      INSTRUCTIONS:
+        "This activity shows live readings from your device's motion sensors. Hold your phone and move it around to see the numbers change. Tap Done when you are finished.",
       GAME_OVER: "Game Over",
+      PERMISSION: "Grant accelerometer permission",
+      PERMISSION_DENIED:
+        "Motion access was denied. Close and reopen this activity, then tap Allow.",
+      MOTION_WAITING: "Waiting for sensor data\u2026",
+      MOTION_UNAVAILABLE: "No motion sensor is available on this device.",
+      MOTION_NO_DATA: "The motion sensor is reporting no data.",
+      ACCELERATION: "Acceleration",
+      ACCELERATION_WITH_GRAVITY: "Acceleration (with gravity)",
+      ROTATION_RATE: "Rotation rate",
+      SAMPLES: "Samples",
+      RATE: "Rate",
+      INTERVAL: "Interval",
+      Done: "Done",
       Instructions: "Instructions",
       Start: "Start",
       Questionnaire: "Questionnaire",

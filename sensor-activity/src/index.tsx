@@ -7,10 +7,7 @@ import "./index.css";
 let root: ReturnType<typeof createRoot> | null = null;
 
 window.addEventListener("message", (e: any) => {
-	console.log("Message Event Listener Called")
 	const data = e.data;
-	
-	console.log(data);
 
 	if (!data || typeof data !== "object" || (!data.configuration && !data.activity && !data.settings)) {
 		return;
