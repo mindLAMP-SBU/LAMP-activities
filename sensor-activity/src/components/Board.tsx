@@ -163,18 +163,6 @@ const Board: React.FC<Props> = ({ data }) => {
                 {theta.current.toFixed(1)}
               </div>
             </div>
-            <div className="sensor-stat">
-              <div className="sensor-stat-label">Seen / Applied</div>
-              <div className="sensor-stat-value">
-                {seenRef.current} / {appliedRef.current}
-              </div>
-            </div>
-            <div className="sensor-stat">
-              <div className="sensor-stat-label">Last dt</div>
-              <div className="sensor-stat-value">
-                {lastDtRef.current.toFixed(1)} ms
-              </div>
-            </div>
           </div>
           <SensorReadout motion={motion} />
           <button className="sensor-btn" onClick={finishActivity}>

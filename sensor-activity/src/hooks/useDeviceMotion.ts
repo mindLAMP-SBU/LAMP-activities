@@ -150,9 +150,7 @@ const EMPTY_SNAPSHOT: Snapshot = {
   hasData: false,
 };
 
-export function useDeviceMotion(
-  options: UseDeviceMotionOptions = {}
-): DeviceMotionState {
+export function useDeviceMotion(options: UseDeviceMotionOptions = {}): DeviceMotionState {
   const { enabled = true, uiIntervalMs = 100, bufferSize = 50, onSample } = options;
 
   // Held in a ref so a caller passing an inline closure does not re-subscribe
@@ -209,9 +207,8 @@ export function useDeviceMotion(
 
   const listening = enabled && permission === "granted";
 
-  // --- listener lifecycle -----------------------------------------------
+  // listener lifecycle
   useEffect(() => {
-    // tsconfig sets noImplicitReturns, so the early exit must return a value.
     if (!listening) return undefined;
 
     latestRef.current = null;
@@ -229,7 +226,7 @@ export function useDeviceMotion(
     };
   }, [listening, handleMotion]);
 
-  // --- throttled publish into React -------------------------------------
+  // throttled publish into React
   useEffect(() => {
     if (!listening) return undefined;
     const id = window.setInterval(() => {
@@ -240,8 +237,6 @@ export function useDeviceMotion(
       tickCountRef.current = countRef.current;
 
       if (delta === 0) {
-        // Nothing arrived. Publish one zeroed-rate snapshot, then go quiet so a
-        // stalled or absent sensor costs no renders at all.
         if (idleRef.current) return;
         idleRef.current = true;
       } else {
