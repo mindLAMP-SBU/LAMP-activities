@@ -1,13 +1,11 @@
 import React, { MutableRefObject, useEffect, useRef } from "react";
-import Car from "src/icons/Car";
-import { renderToStaticMarkup } from "react-dom/server";
 
 const FPS = 60;
 const FRAME_INTERVAL = 1000 / FPS;
 
 const ROAD_STRIP_GAP = 100
-const CAR_WIDTH = 70
-const CAR_LENGTH = 100
+const CAR_WIDTH = 50
+const CAR_LENGTH = 80
 
 interface GameCanvasProps {
     width?: number;
@@ -26,7 +24,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Game state lives in a ref so updating it never triggers a React re-render
-    const stateRef = useRef({ x: width/2 - CAR_WIDTH/2, y: height - 150, roadYOffset: 0 });
+    const stateRef = useRef({
+        x: width/2 - CAR_WIDTH/2, 
+        y: height - 150, 
+        roadYOffset: 0,
+        // Points reperesenting the car
+        p1: {x: 0, y: 0},
+        p2: {x: 0, y: 0},
+        p3: {x: 0, y: 0},
+        p4: {x: 0, y: 0},
+    });
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -45,6 +52,33 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         const update = () => {
             const s = stateRef.current;
 
+            const rad = (-1 * 30 * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+
+            // Move car
+            s.x += sin * 4
+
+            if (s.x < 0)
+                s.x = 0
+            else if (s.x + CAR_WIDTH > width)
+                s.x = width - CAR_WIDTH
+
+            // Apply rotation to the car
+            const cx = s.x + CAR_WIDTH / 2;
+            const cy = s.y + CAR_LENGTH / 2;
+
+            const rot = (x: number, y: number) => ({
+            x: cx + (x - cx) * cos - (y - cy) * sin,
+            y: cy + (x - cx) * sin + (y - cy) * cos,
+            });
+
+            s.p1 = rot(s.x, s.y);
+            s.p2 = rot(s.x + CAR_WIDTH, s.y);
+            s.p3 = rot(s.x + CAR_WIDTH, s.y + CAR_LENGTH);
+            s.p4 = rot(s.x, s.y + CAR_LENGTH);
+
+            // Move background
             s.roadYOffset += 4;
             if (s.roadYOffset > height)
                 s.roadYOffset = s.roadYOffset % ROAD_STRIP_GAP;
@@ -58,9 +92,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             ctx.fillStyle = COLORS.grass;
             ctx.fillRect(0, 0, width, height);
             ctx.fillStyle = "white";
-            ctx.fillRect(width/2 - 100, 0, 200, height);
+            ctx.fillRect(width/2 - 85, 0, 170, height);
             ctx.fillStyle = COLORS.road;
-            ctx.fillRect(width/2 - 95, 0, 190, height);
+            ctx.fillRect(width/2 - 80, 0, 160, height);
             ctx.fillStyle = COLORS.roadStripes;
             for (let i = 0; i < 20; i++)
             {
@@ -68,28 +102,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             }
             
             // Placeholder for car
-            const rad = (-1 * rotation.current * Math.PI) / 180;
-            const cos = Math.cos(rad);
-            const sin = Math.sin(rad);
-            const cx = s.x + CAR_WIDTH / 2;
-            const cy = s.y + CAR_LENGTH / 2;
-
-            const rot = (x: number, y: number) => ({
-            x: cx + (x - cx) * cos - (y - cy) * sin,
-            y: cy + (x - cx) * sin + (y - cy) * cos,
-            });
-
-            const p1 = rot(s.x, s.y);
-            const p2 = rot(s.x + CAR_WIDTH, s.y);
-            const p3 = rot(s.x + CAR_WIDTH, s.y + CAR_LENGTH);
-            const p4 = rot(s.x, s.y + CAR_LENGTH);
-
             ctx.fillStyle = COLORS.car;
             ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.lineTo(p3.x, p3.y);
-            ctx.lineTo(p4.x, p4.y);
+            ctx.moveTo(s.p1.x, s.p1.y);
+            ctx.lineTo(s.p2.x, s.p2.y);
+            ctx.lineTo(s.p3.x, s.p3.y);
+            ctx.lineTo(s.p4.x, s.p4.y);
             ctx.closePath();
             ctx.fill();
 

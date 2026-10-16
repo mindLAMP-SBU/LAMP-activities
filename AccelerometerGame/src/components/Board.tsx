@@ -155,7 +155,7 @@ const Board: React.FC<Props> = ({ data }) => {
       {/* Playing — the activity's own UI goes here. */}
       {phase === "playing" && (
         <div className="activity-area">
-          <GameCanvas rotation={theta} height={window.innerHeight - 200} width={window.innerWidth}/>
+          <GameCanvas rotation={theta} height={window.innerHeight - 52} width={window.innerWidth}/>
         </div>
       )}
 
