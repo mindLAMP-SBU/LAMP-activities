@@ -52,7 +52,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         const update = () => {
             const s = stateRef.current;
 
-            const rad = (-1 * 30 * Math.PI) / 180;
+            const rad = (-1 * rotation.current * Math.PI) / 180;
             const cos = Math.cos(rad);
             const sin = Math.sin(rad);
 
@@ -122,7 +122,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             const elapsed = now - lastTime;
             if (elapsed < FRAME_INTERVAL) return;
 
-            // Carry the leftover time forward so the frame rate stays at 30 FPS
             lastTime = now - (elapsed % FRAME_INTERVAL);
 
             update();
