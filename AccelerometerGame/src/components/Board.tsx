@@ -60,8 +60,10 @@ const Board: React.FC<Props> = ({ data }) => {
     lastDtRef.current = dt;
     if (gamma === null || dt <= 0) return;
     appliedRef.current += 1;
-    // Wrap so a long session can't drift off into float noise.
-    theta.current = (((theta.current + (gamma * dt) / 1000) % 360) + 360) % 360;
+
+    let t = theta.current + (gamma * dt) / 1000;
+    t -= t * 0.5 * (dt / 1000);
+    theta.current = ((t + 180) % 360 + 360) % 360 - 180;
   }, []);
 
   // Only listen while the readout is on screen.
