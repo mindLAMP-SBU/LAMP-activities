@@ -9,7 +9,7 @@ const resources = {
     translation: {
       GAME: "Sensor Activity",
       INSTRUCTIONS:
-        "This activity shows live readings from your device's motion sensors. Hold your phone and move it around to see the numbers change. Tap Done when you are finished.",
+        "This activity requires your phone to be in landscape position. Please rotate your phone before pressing start.",
       GAME_OVER: "Game Over",
       PERMISSION: "Grant accelerometer permission",
       PERMISSION_DENIED:

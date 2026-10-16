@@ -26,7 +26,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Game state lives in a ref so updating it never triggers a React re-render
-    const stateRef = useRef({ x: width/2 - CAR_WIDTH/2, y: height - 150, vx: 4, vy: 3, radius: 15, roadYOffset: 0 });
+    const stateRef = useRef({ x: width/2 - CAR_WIDTH/2, y: height - 150, roadYOffset: 0 });
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -48,7 +48,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             s.roadYOffset += 4;
             if (s.roadYOffset > height)
                 s.roadYOffset = s.roadYOffset % ROAD_STRIP_GAP;
-            //console.log(rotation.current);
         };
 
         const draw = () => {
@@ -63,7 +62,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             ctx.fillStyle = COLORS.road;
             ctx.fillRect(width/2 - 95, 0, 190, height);
             ctx.fillStyle = COLORS.roadStripes;
-            for (let i = 0; i < 9; i++)
+            for (let i = 0; i < 20; i++)
             {
                 ctx.fillRect(width/2 -2.5, i * ROAD_STRIP_GAP + s.roadYOffset - height, 5, 25);
             }
