@@ -69,7 +69,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             }
             
             // Placeholder for car
-            const rad = (rotation.current * Math.PI) / 180;
+            const rad = (-1 * rotation.current * Math.PI) / 180;
             const cos = Math.cos(rad);
             const sin = Math.sin(rad);
             const cx = s.x + CAR_WIDTH / 2;
