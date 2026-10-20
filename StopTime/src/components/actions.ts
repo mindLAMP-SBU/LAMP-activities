@@ -10,7 +10,7 @@ import rawActions from "../actions.json";
 
 export interface ButtonSpec {
   text: string;
-  /** "Green" | "Yellow" | "Red"; anything else falls back to a neutral grey. */
+  /** "Green" | "Yellow" | "Red"; anything else falls back to a neutral gray. */
   color: string;
   /** Present and true on the button(s) that count as a correct answer. */
   correct?: boolean;
@@ -33,32 +33,128 @@ export interface CategorySpec {
 
 export const CATEGORIES: CategorySpec[] = rawActions as CategorySpec[];
 
+// ── Settings ──────────────────────────────────────────────────────────────
+//
+// A researcher can replace the bundled content by putting a `categories` array
+// (same shape as actions.json) into the activity's settings. The activity is
+// published under a spec other dashboards know by a different shape, so the
+// settings object is read defensively: unknown keys are ignored, and anything
+// malformed falls back to the bundled content rather than breaking a session.
+
+export const DEFAULT_TRIALS = 16;
+export const MAX_TRIALS = 90;
+
+export interface ResolvedSettings {
+  trials: number;
+  categories: CategorySpec[];
+  source: "custom" | "built-in";
+}
+
+const isText = (v: any): v is string => typeof v === "string" && v.trim() !== "";
+
+function cleanButton(raw: any): ButtonSpec | null {
+  if (!raw || typeof raw !== "object" || !isText(raw.text)) return null;
+  return {
+    text: raw.text,
+    color: typeof raw.color === "string" ? raw.color : "",
+    ...(raw.correct === true && { correct: true }),
+  };
+}
+
+/**
+ * Normalise one option from settings. `strict` (the default, used for real
+ * sessions) drops an option that cannot be scored; the editor's preview passes
+ * false so a half-written scenario still plays.
+ */
+export function cleanOption(raw: any, strict = true): OptionSpec | null {
+  if (!raw || typeof raw !== "object" || (strict && !isText(raw.id))) return null;
+  const buttons = (Array.isArray(raw.buttons) ? raw.buttons : [])
+    .map(cleanButton)
+    .filter((b: ButtonSpec | null): b is ButtonSpec => b !== null);
+  // A trial with nothing to press, or nothing right to press, cannot be scored.
+  if (strict && (buttons.length === 0 || !buttons.some((b: ButtonSpec) => b.correct))) {
+    console.warn(`[StopTime] option "${raw.id}" has no usable correct button; skipped`);
+    return null;
+  }
+  return {
+    id: isText(raw.id) ? raw.id : "preview",
+    ...(isText(raw.display) && { display: raw.display }),
+    scene: isText(raw.scene) ? raw.scene : "road-normal",
+    buttons,
+    animations: (Array.isArray(raw.animations) ? raw.animations : []).filter(
+      (l: any) => typeof l === "string"
+    ),
+  };
+}
+
+function cleanCategories(raw: any): CategorySpec[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((c: any): CategorySpec | null => {
+      if (!c || typeof c !== "object" || !isText(c.category)) return null;
+      const options = (Array.isArray(c.options) ? c.options : [])
+        .map((o: any) => cleanOption(o))
+        .filter((o: OptionSpec | null): o is OptionSpec => o !== null);
+      return options.length > 0 ? { category: c.category, options } : null;
+    })
+    .filter((c): c is CategorySpec => c !== null);
+}
+
+export function resolveSettings(raw: any): ResolvedSettings {
+  const settings = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const n = settings.trials == null || settings.trials === "" ? NaN : Number(settings.trials);
+  const trials = Number.isFinite(n) ? Math.max(1, Math.min(MAX_TRIALS, Math.round(n))) : DEFAULT_TRIALS;
+  const custom = cleanCategories(settings.categories);
+  return custom.length > 0
+    ? { trials, categories: custom, source: "custom" }
+    : { trials, categories: CATEGORIES, source: "built-in" };
+}
+
 // ── The animation language ────────────────────────────────────────────────
 //
-//   <seconds> Asset <Name> Load [Zoom]
+//   <seconds> Asset <Name> Load [Zoom] [Location <x> <y>] [Size <size>]
 //   <seconds> Asset <Name> Animate <state>
+//   <seconds> Asset <Name> Location <x> <y> <duration>
+//   <seconds> Asset <Name> Size <size> <duration>
 //   <seconds> Asset <Name> Unload
 //   <seconds> Scene <name>
 //   <seconds> End
 //
 // Seconds may be fractional. `Load` without `Zoom` puts the asset on screen at
-// full size immediately. An unrecognised line is skipped with a warning rather
+// full size immediately. Location is an offset from where the asset is drawn,
+// in scene units (the scene is 500 × 400), with positive y moving up; Size
+// scales the asset around its anchor (see registry.ts). Both default to 0 0
+// and 1. The Location and Size actions glide to their new value over
+// <duration> seconds (0 = instantly). Anything moved past the scene's edge is
+// clipped by the stage. An unrecognized line is skipped with a warning rather
 // than throwing, so one typo cannot freeze a trial mid-session.
 
+export interface Placement {
+  x: number;
+  y: number;
+  size: number;
+}
+
+export const DEFAULT_PLACEMENT: Placement = { x: 0, y: 0, size: 1 };
+
 export type Step =
-  | { at: number; kind: "load"; asset: string; zoom: boolean }
+  | ({ at: number; kind: "load"; asset: string; zoom: boolean } & Placement)
   | { at: number; kind: "animate"; asset: string; state: string }
+  | { at: number; kind: "location"; asset: string; x: number; y: number; duration: number }
+  | { at: number; kind: "size"; asset: string; size: number; duration: number }
   | { at: number; kind: "unload"; asset: string }
   | { at: number; kind: "scene"; scene: string }
   | { at: number; kind: "end" };
 
-function parseLine(line: string, optionId: string): Step | null {
+type Warn = (message: string) => void;
+
+function parseLine(line: string, warn: Warn): Step | null {
   const t = line.trim().split(/\s+/).filter(Boolean);
   if (t.length === 0) return null;
 
   const at = Number(t[0]) * 1000;
   if (!Number.isFinite(at) || at < 0) {
-    console.warn(`[StopTime] ${optionId}: bad timestamp in "${line}"`);
+    warn(`bad timestamp in "${line}"`);
     return null;
   }
 
@@ -68,7 +164,7 @@ function parseLine(line: string, optionId: string): Step | null {
 
   if (verb === "scene") {
     if (!t[2]) {
-      console.warn(`[StopTime] ${optionId}: Scene needs a name in "${line}"`);
+      warn(`Scene needs a name in "${line}"`);
       return null;
     }
     return { at, kind: "scene", scene: t[2] };
@@ -77,7 +173,7 @@ function parseLine(line: string, optionId: string): Step | null {
   // `Unload <Name>` is accepted as a shorthand for `Asset <Name> Unload`.
   if (verb === "unload") {
     if (!t[2]) {
-      console.warn(`[StopTime] ${optionId}: Unload needs an asset in "${line}"`);
+      warn(`Unload needs an asset in "${line}"`);
       return null;
     }
     return { at, kind: "unload", asset: t[2] };
@@ -87,25 +183,63 @@ function parseLine(line: string, optionId: string): Step | null {
     const asset = t[2];
     const op = (t[3] ?? "").toLowerCase();
     if (!asset || !op) {
-      console.warn(`[StopTime] ${optionId}: incomplete Asset line "${line}"`);
+      warn(`incomplete Asset line "${line}"`);
       return null;
     }
+    const num = (i: number) => (t[i] === undefined ? NaN : Number(t[i]));
+    // A missing duration means "instantly"; a bad one is a typo worth flagging.
+    const duration = (i: number) => {
+      const d = t[i] === undefined ? 0 : num(i);
+      return Number.isFinite(d) && d >= 0 ? d * 1000 : NaN;
+    };
+
     if (op === "load") {
-      return { at, kind: "load", asset, zoom: t.slice(4).some((m) => m.toLowerCase() === "zoom") };
+      const step: Step = { at, kind: "load", asset, zoom: false, ...DEFAULT_PLACEMENT };
+      for (let i = 4; i < t.length; i++) {
+        const word = t[i].toLowerCase();
+        if (word === "zoom") step.zoom = true;
+        else if (word === "location" && Number.isFinite(num(i + 1)) && Number.isFinite(num(i + 2))) {
+          step.x = num(i + 1);
+          step.y = num(i + 2);
+          i += 2;
+        } else if (word === "size" && num(i + 1) > 0) {
+          step.size = num(i + 1);
+          i += 1;
+        } else {
+          warn(`ignoring "${t[i]}" in Load line "${line}"`);
+        }
+      }
+      return step;
+    }
+    if (op === "location") {
+      const [x, y, d] = [num(4), num(5), duration(6)];
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(d)) {
+        warn(`Location needs <x> <y> <duration> in "${line}"`);
+        return null;
+      }
+      return { at, kind: "location", asset, x, y, duration: d };
+    }
+    if (op === "size") {
+      const [size, d] = [num(4), duration(5)];
+      if (!(size > 0) || !Number.isFinite(d)) {
+        warn(`Size needs a size above 0 and a <duration> in "${line}"`);
+        return null;
+      }
+      return { at, kind: "size", asset, size, duration: d };
     }
     if (op === "animate") {
       if (!t[4]) {
-        console.warn(`[StopTime] ${optionId}: Animate needs a state in "${line}"`);
+        warn(`Animate needs a state in "${line}"`);
         return null;
       }
       return { at, kind: "animate", asset, state: t[4] };
     }
     if (op === "unload") return { at, kind: "unload", asset };
-    console.warn(`[StopTime] ${optionId}: unknown Asset operation in "${line}"`);
+    warn(`unknown Asset operation in "${line}"`);
     return null;
   }
 
-  console.warn(`[StopTime] ${optionId}: unknown action in "${line}"`);
+  warn(`unknown action in "${line}"`);
   return null;
 }
 
@@ -115,9 +249,17 @@ export interface Timeline {
   endAt: number;
 }
 
-export function parseTimeline(option: OptionSpec): Timeline {
+/**
+ * `warnings`, when given, collects every problem found in the timeline as well
+ * as logging it, so the editor's preview can show them to the researcher.
+ */
+export function parseTimeline(option: OptionSpec, warnings?: string[]): Timeline {
+  const warn: Warn = (message) => {
+    console.warn(`[StopTime] ${option.id}: ${message}`);
+    warnings?.push(message);
+  };
   const steps = (option.animations ?? [])
-    .map((line) => parseLine(line, option.id))
+    .map((line) => parseLine(line, warn))
     .filter((s): s is Step => s !== null)
     .sort((a, b) => a.at - b.at);
 
@@ -126,7 +268,7 @@ export function parseTimeline(option: OptionSpec): Timeline {
   // fall back to opening the window once the last step has played.
   const endAt = end ? end.at : steps.length > 0 ? steps[steps.length - 1].at : 0;
   if (!end) {
-    console.warn(`[StopTime] ${option.id}: no "End" line; opening answers at ${endAt}ms`);
+    warn(`no "End" line; opening answers at ${endAt}ms`);
   }
 
   return { steps, endAt };

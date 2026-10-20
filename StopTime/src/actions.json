@@ -5,7 +5,7 @@
             {
                 "id": "bus_driving",
                 "display": "Bus (Driving)",
-                "scene": "road-normal",
+                "scene": "road-single-lane",
                 "buttons": [
                     { "text": "Continue", "color": "Green", "correct": true },
                     { "text": "Slow Down", "color": "Yellow" },
@@ -19,7 +19,7 @@
             {
                 "id": "bus_amber",
                 "display": "Bus (Amber Lights)",
-                "scene": "road-normal",
+                "scene": "road-single-lane",
                 "buttons": [
                     { "text": "Continue", "color": "Green" },
                     { "text": "Slow Down", "color": "Yellow", "correct": true },
@@ -34,7 +34,7 @@
             {
                 "id": "bus_stopping",
                 "display": "Bus (Stopping)",
-                "scene": "road-normal",
+                "scene": "road-single-lane",
                 "buttons": [
                     { "text": "Continue", "color": "Green" },
                     { "text": "Slow Down", "color": "Yellow" },
@@ -45,6 +45,51 @@
                     "1 Asset SchoolBus Animate amber",
                     "2.5 Asset SchoolBus Animate sign",
                     "4 End"
+                ]
+            },
+            {
+                "id": "police_driving",
+                "display": "Police Car (Driving)",
+                "scene": "road-single-lane",
+                "buttons": [
+                    { "text": "Continue", "color": "Green", "correct": true },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red" }
+                ],
+                "animations": [
+                    "0 Asset PoliceCar Load Zoom",
+                    "2 End"
+                ]
+            },
+            {
+                "id": "police_lights",
+                "display": "Police Car (Lights Ahead)",
+                "scene": "road-single-lane",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red", "correct": true }
+                ],
+                "animations": [
+                    "0 Asset PoliceCar Load Zoom",
+                    "1 Asset PoliceCar Animate lights",
+                    "2.5 End"
+                ]
+            },
+            {
+                "id": "police_pulled_over",
+                "display": "Police Car (Pulled Over)",
+                "scene": "road-single-lane",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow", "correct": true },
+                    { "text": "Stop", "color": "Red" }
+                ],
+                "animations": [
+                    "0 Asset PoliceCar Load Zoom",
+                    "1 Asset PoliceCar Animate lights",
+                    "1.5 Asset PoliceCar Animate pulled-over",
+                    "3.5 End"
                 ]
             }
         ]
@@ -100,7 +145,7 @@
         ]
     },
     {
-        "category": "Pedestrians",
+        "category": "Obstacles",
         "options": [
             {
                 "id": "ped_waiting",
@@ -129,6 +174,119 @@
                     "0 Asset Pedestrian Load Zoom",
                     "1 Asset Pedestrian Animate crossing",
                     "2 End"
+                ]
+            },
+            {
+                "id": "deer_roadside",
+                "display": "Deer (Roadside)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow", "correct": true },
+                    { "text": "Stop", "color": "Red" }
+                ],
+                "animations": [
+                    "0 Asset Deer Load Zoom",
+                    "2 End"
+                ]
+            },
+            {
+                "id": "deer_crossing",
+                "display": "Deer (Crossing)",
+                "scene": "road-normal",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red", "correct": true }
+                ],
+                "animations": [
+                    "0 Asset Deer Load Zoom",
+                    "1 Asset Deer Animate crossing",
+                    "2.5 End"
+                ]
+            }
+        ]
+    },
+    {
+        "category": "Work Zones",
+        "options": [
+            {
+                "id": "work_slow",
+                "display": "Flagger (Slow)",
+                "scene": "road-single-lane",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow", "correct": true },
+                    { "text": "Stop", "color": "Red" }
+                ],
+                "animations": [
+                    "0 Asset ConstructionZone Load Zoom",
+                    "2 End"
+                ]
+            },
+            {
+                "id": "work_stop",
+                "display": "Flagger (Stop)",
+                "scene": "road-single-lane",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red", "correct": true }
+                ],
+                "animations": [
+                    "0 Asset ConstructionZone Load Zoom",
+                    "1.5 Asset ConstructionZone Animate stop",
+                    "2.5 End"
+                ]
+            }
+        ]
+    },
+    {
+        "category": "Railroad",
+        "options": [
+            {
+                "id": "rail_idle",
+                "display": "Railroad Crossing (Clear)",
+                "scene": "road-single-lane",
+                "buttons": [
+                    { "text": "Continue", "color": "Green", "correct": true },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red" }
+                ],
+                "animations": [
+                    "0 Asset RailroadCrossing Load Zoom",
+                    "2 End"
+                ]
+            },
+            {
+                "id": "rail_flashing",
+                "display": "Railroad Crossing (Flashing)",
+                "scene": "road-single-lane",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red", "correct": true }
+                ],
+                "animations": [
+                    "0 Asset RailroadCrossing Load Zoom",
+                    "1 Asset RailroadCrossing Animate flashing",
+                    "2.5 End"
+                ]
+            },
+            {
+                "id": "rail_gates",
+                "display": "Railroad Crossing (Gates Down)",
+                "scene": "road-single-lane",
+                "buttons": [
+                    { "text": "Continue", "color": "Green" },
+                    { "text": "Slow Down", "color": "Yellow" },
+                    { "text": "Stop", "color": "Red", "correct": true }
+                ],
+                "animations": [
+                    "0 Asset RailroadCrossing Load Zoom",
+                    "1 Asset RailroadCrossing Animate flashing",
+                    "2 Asset RailroadCrossing Animate gates",
+                    "4 End"
                 ]
             }
         ]

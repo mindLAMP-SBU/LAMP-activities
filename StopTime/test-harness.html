@@ -16,7 +16,7 @@
     #controls select, #controls input { padding: 5px 8px; border-radius: 4px; border: 1px solid #555; background: #444; color: #fff; font-size: 13px; }
     #controls input[type="number"] { width: 60px; }
     #controls label { font-size: 12px; color: #aaa; }
-    #main { display: flex; height: calc(100vh - 80px); }
+    #main { display: flex; height: calc(100vh - 120px); }
     #game-panel { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: auto; }
     #game-panel iframe { width: 100%; height: 100%; border: none; }
     /* Device preview mode */
@@ -109,7 +109,21 @@
           <option value="zh-HK">zh-HK</option>
         </select>
       </label>
+      <label>Scenarios:
+        <select id="scenario-select">
+          <option value="builtin" selected>Built-in (no categories)</option>
+          <option value="custom">Custom categories</option>
+          <option value="spinwheel">Spin-the-Wheel-shaped settings</option>
+        </select>
+      </label>
       <button class="btn-send" onclick="sendConfig()">Send Config</button>
+    </div>
+    <div class="row row-activity" id="editor-controls">
+      <strong>Editor protocol</strong>
+      <button class="btn-toggle" onclick="sendDescribe()">Describe</button>
+      <label>Category # <input type="number" id="preview-cat" value="0" min="0"></label>
+      <label>Option # <input type="number" id="preview-opt" value="0" min="0"></label>
+      <button class="btn-toggle" onclick="sendPreview()">Preview (custom set)</button>
     </div>
   </div>
   <div id="main">
@@ -146,13 +160,77 @@
     //   - e.data.configuration.language
     //   - e.data.activity.settings.trials
     //
-    // Everything else — categories, options, buttons and animation timing —
-    // comes from src/actions.json, which is bundled into the build.
+    //   - e.data.activity.settings.categories (optional; replaces the bundled
+    //     src/actions.json when present)
     //   - e.data.noBack
     //   - e.data.forward
     // =================================================================
 
     var lastResult = null;
+
+    // A small custom scenario set, in the actions.json shape.
+    var CUSTOM_CATEGORIES = [
+      {
+        category: 'Custom Bus',
+        options: [
+          {
+            id: 'custom_bus_sign',
+            display: 'Bus with stop arm',
+            scene: 'road-normal',
+            buttons: [
+              { text: 'Go', color: 'Green' },
+              { text: 'Halt', color: 'Red', correct: true }
+            ],
+            animations: ['0 Asset SchoolBus Load Zoom', '1.5 Asset SchoolBus Animate sign', '2 End']
+          },
+          {
+            id: 'custom_ped',
+            scene: 'road-normal',
+            buttons: [
+              { text: 'Go', color: 'Green' },
+              { text: 'Halt', color: 'Red', correct: true }
+            ],
+            animations: ['0 Asset Pedestrian Load', '1 Asset Pedestrian Animate crossing', '1.5 End']
+          }
+        ]
+      }
+    ];
+
+    // What a stock dashboard stores for lamp.spin_wheel; must fall back cleanly.
+    var SPIN_WHEEL_SETTINGS = {
+      low_risk: [{ win: { sum: 50, probability: 50 } }],
+      high_risk: [{ win: { sum: 250, probability: 25 } }],
+      spins_per_game: 20,
+      balance: 2000
+    };
+
+    function scenarioSettings(trials) {
+      var mode = document.getElementById('scenario-select').value;
+      if (mode === 'custom') return { trials: trials, categories: CUSTOM_CATEGORIES };
+      if (mode === 'spinwheel') return SPIN_WHEEL_SETTINGS;
+      return { trials: trials };
+    }
+
+    function sendDescribe() {
+      getIframe().contentWindow.postMessage({ lamp_editor: { type: 'describe', requestId: 'harness-' + Date.now() } }, '*');
+      log('Sent describe');
+    }
+
+    function sendPreview() {
+      var target = {
+        categoryIndex: parseInt(document.getElementById('preview-cat').value, 10) || 0,
+        optionIndex: parseInt(document.getElementById('preview-opt').value, 10) || 0
+      };
+      getIframe().contentWindow.postMessage({
+        lamp_editor: {
+          type: 'preview',
+          settings: { categories: CUSTOM_CATEGORIES },
+          target: target,
+          configuration: { language: document.getElementById('lang-select').value }
+        }
+      }, '*');
+      log('Sent preview ' + JSON.stringify(target));
+    }
 
     // --- Iframe / PostMessage -----------------------------------------
     function getIframe() {
@@ -162,7 +240,7 @@
     function sendConfig() {
       var lang = document.getElementById('lang-select').value;
       var trials = parseInt(document.getElementById('trials').value, 10) || 8;
-      var settings = { trials: trials };
+      var settings = scenarioSettings(trials);
       var config = {
         configuration: { language: lang },
         activity: { settings: settings },
@@ -171,7 +249,7 @@
         forward: true
       };
       getIframe().contentWindow.postMessage(config, '*');
-      log('Sent config: situations=' + trials + ', lang=' + lang);
+      log('Sent config: situations=' + trials + ', lang=' + lang + ', scenarios=' + document.getElementById('scenario-select').value);
     }
 
     function reloadActivity() {
@@ -188,6 +266,16 @@
         data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
       } catch (err) {
         log('Non-JSON message: ' + String(e.data).substring(0, 100));
+        return;
+      }
+      if (data && data.lamp_editor) {
+        var m = data.lamp_editor;
+        if (m.type === 'manifest') {
+          log('Manifest: ' + JSON.stringify({ scenes: m.manifest.scenes, assets: m.manifest.assets, buttonColors: m.manifest.buttonColors }));
+          renderRawTab(m);
+        } else {
+          log('Editor ' + m.type + ': ' + JSON.stringify(m).substring(0, 200));
+        }
         return;
       }
       if (!data.temporal_slices && !data.static_data && !data.forward && !data.clickBack) {
@@ -222,6 +310,7 @@
       html += scoreCard('Done', data.done ? 'Yes' : (data.clickBack ? 'Back' : 'No'), false);
       html += scoreCard('Situations', s.trials, false);
       html += scoreCard('Category', s.category || '---', false);
+      html += scoreCard('Scenarios', s.scenario_source || '---', false);
       html += '</div>';
 
       // Accuracy - the primary outcome for this activity

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faArrowRight, faRedo } from "@fortawesome/free-solid-svg-icons";
 import { InstructionModal } from "./InstructionModal";
@@ -6,15 +6,24 @@ import { Questionnaire } from "./Questionnaire";
 import { CategorySelect } from "./CategorySelect";
 import {
   ButtonSpec,
-  CATEGORIES,
   CategorySpec,
   OptionSpec,
   buildDeck,
+  cleanOption,
   correctButtons,
   isCorrect,
   parseTimeline,
+  resolveSettings,
 } from "./actions";
-import { ASSETS, BUTTON_COLOR_CLASS, DEFAULT_BUTTON_CLASS, SCENES } from "./registry";
+import { PreviewTarget, checkOption, reply } from "./editor";
+import {
+  ASSETS,
+  BUTTON_COLOR_CLASS,
+  DEFAULT_BUTTON_CLASS,
+  SCENES,
+  SCENE_HEIGHT,
+  SCENE_WIDTH,
+} from "./registry";
 import i18n from "../i18n";
 import "./StopTime.css";
 
@@ -33,6 +42,13 @@ interface LoadedAsset {
   name: string;
   state: string;
   zooming: boolean;
+  /** Offset from where the asset is drawn, in scene units; +y is up. */
+  x: number;
+  y: number;
+  size: number;
+  /** How long the latest Location / Size change takes to play out. */
+  moveMs: number;
+  sizeMs: number;
 }
 
 interface TrialResult {
@@ -47,6 +63,11 @@ interface TrialResult {
 
 interface Props {
   data: any;
+  /**
+   * Set when a dashboard editor asks for a preview: play just this option from
+   * the settings being edited, on repeat, and never report results.
+   */
+  preview?: PreviewTarget;
 }
 
 function median(arr: number[]): number {
@@ -61,14 +82,24 @@ function mean(arr: number[]): number {
   return Math.round(arr.reduce((s, v) => s + v, 0) / arr.length);
 }
 
-const Board: React.FC<Props> = ({ data }) => {
-  const settings = data.activity?.settings ?? data.settings ?? {};
-  const trials = Math.max(1, Math.min(90, settings.trials ?? 16));
+const Board: React.FC<Props> = ({ data, preview }) => {
+  const rawSettings = data.activity?.settings ?? data.settings;
+  const resolved = useMemo(() => resolveSettings(rawSettings), [rawSettings]);
+  const trials = preview ? 1 : resolved.trials;
   const language = data.configuration?.language ?? "en-US";
-  const showForward = data.forward ?? false;
-  const noBack = data.noBack ?? false;
+  const showForward = !preview && (data.forward ?? false);
+  const noBack = preview || (data.noBack ?? false);
 
-  const [phase, setPhase] = useState<Phase>("instructions");
+  // A preview indexes into the settings exactly as the editor holds them, so
+  // it reads the raw option rather than the cleaned list (which may have
+  // dropped half-written scenarios and shifted the indexes).
+  const [previewOption] = useState<OptionSpec | null>(() => {
+    if (!preview) return null;
+    const rawCategory = rawSettings?.categories?.[preview.categoryIndex];
+    return cleanOption(rawCategory?.options?.[preview.optionIndex], false);
+  });
+
+  const [phase, setPhase] = useState<Phase>(preview ? "script" : "instructions");
   const [category, setCategory] = useState<CategorySpec | null>(null);
   const [trialIndex, setTrialIndex] = useState(0);
   const [option, setOption] = useState<OptionSpec | null>(null);
@@ -130,7 +161,19 @@ const Board: React.FC<Props> = ({ data }) => {
                 setLoaded((prev) =>
                   prev.some((a) => a.name === step.asset)
                     ? prev
-                    : [...prev, { name: step.asset, state: def.initialState, zooming: step.zoom }]
+                    : [
+                        ...prev,
+                        {
+                          name: step.asset,
+                          state: def.initialState,
+                          zooming: step.zoom,
+                          x: step.x,
+                          y: step.y,
+                          size: step.size,
+                          moveMs: 0,
+                          sizeMs: 0,
+                        },
+                      ]
                 );
                 // Let the far-away frame paint before releasing the zoom.
                 if (step.zoom) {
@@ -149,6 +192,20 @@ const Board: React.FC<Props> = ({ data }) => {
               case "animate":
                 setLoaded((prev) =>
                   prev.map((a) => (a.name === step.asset ? { ...a, state: step.state } : a))
+                );
+                return;
+              case "location":
+                setLoaded((prev) =>
+                  prev.map((a) =>
+                    a.name === step.asset ? { ...a, x: step.x, y: step.y, moveMs: step.duration } : a
+                  )
+                );
+                return;
+              case "size":
+                setLoaded((prev) =>
+                  prev.map((a) =>
+                    a.name === step.asset ? { ...a, size: step.size, sizeMs: step.duration } : a
+                  )
                 );
                 return;
               case "unload":
@@ -219,6 +276,10 @@ const Board: React.FC<Props> = ({ data }) => {
   );
 
   const handleNext = useCallback(() => {
+    if (preview) {
+      startTrial(0);
+      return;
+    }
     const next = trialIndex + 1;
     if (next >= trials) {
       setPhase("gameOver");
@@ -226,7 +287,7 @@ const Board: React.FC<Props> = ({ data }) => {
     } else {
       startTrial(next);
     }
-  }, [trialIndex, trials, startTrial]);
+  }, [preview, trialIndex, trials, startTrial]);
 
   // ── Results payload ───────────────────────────────────
   const buildPayload = useCallback(
@@ -277,16 +338,18 @@ const Board: React.FC<Props> = ({ data }) => {
           median_decision_ms: median(rts),
           mean_decision_all_ms: mean(all.map((r) => r.rt)),
           trials,
+          scenario_source: resolved.source,
           ...(qData && { questionnaire: qData }),
         },
         temporal_slices: routesRef.current,
       };
     },
-    [trials, category]
+    [trials, category, resolved.source]
   );
 
   const sendResult = useCallback(
     (isNav: boolean, isBack: boolean, qData?: any) => {
+      if (preview) return;
       const payload: any = {
         ...buildPayload(qData),
         ...(showForward && { forward: !isBack }),
@@ -295,8 +358,26 @@ const Board: React.FC<Props> = ({ data }) => {
       };
       parent.postMessage(JSON.stringify(payload), "*");
     },
-    [buildPayload, showForward]
+    [preview, buildPayload, showForward]
   );
+
+  // ── Editor preview ────────────────────────────────────
+  useEffect(() => {
+    if (!preview || !previewOption) return;
+    deckRef.current = [previewOption];
+    setCategory({ category: "", options: [previewOption] });
+    startTrial(0);
+    // Mount only: the editor remounts the board for every new preview.
+  }, []);
+
+  useEffect(() => {
+    if (!preview) return;
+    reply(null, {
+      type: "preview_state",
+      phase: previewOption ? phase : "empty",
+      warnings: previewOption ? checkOption(previewOption) : ["nothing to preview"],
+    });
+  }, [preview, previewOption, phase]);
 
   // ── Navigation ────────────────────────────────────────
   const handleBack = () => {
@@ -339,10 +420,33 @@ const Board: React.FC<Props> = ({ data }) => {
 
   const Scene = SCENES[scene];
 
+  // Location and Size wrap the asset in two layers, moved and scaled
+  // separately so each glides over its own duration. They sit outside the
+  // asset's own approach zoom, so a zoom plays out wherever the asset is put.
   const sceneSvg = loaded.map((a) => {
     const def = ASSETS[a.name];
     if (!def) return null;
-    return <def.Svg key={a.name} state={a.state} zooming={a.zooming} />;
+    const [ax, ay] = def.anchor;
+    return (
+      <g
+        key={a.name}
+        style={{
+          transform: `translate(${a.x}px, ${-a.y}px)`,
+          transition: `transform ${a.moveMs}ms linear`,
+        }}
+      >
+        <g
+          style={{
+            transformBox: "view-box",
+            transformOrigin: `${ax}px ${ay}px`,
+            transform: `scale(${a.size})`,
+            transition: `transform ${a.sizeMs}ms linear`,
+          }}
+        >
+          <def.Svg state={a.state} zooming={a.zooming} />
+        </g>
+      </g>
+    );
   });
 
   // Assets that are not purely SVG contribute a DOM layer over the stage. Each
@@ -351,12 +455,29 @@ const Board: React.FC<Props> = ({ data }) => {
     .filter((a) => ASSETS[a.name]?.Overlay)
     .map((a) => {
       const Overlay = ASSETS[a.name].Overlay!;
+      const [ax, ay] = ASSETS[a.name].anchor;
+      // The same two layers as the SVG, in percentages of the stage.
       return (
         <div
           key={a.name}
-          className={"st-overlay-item" + (a.zooming ? " st-overlay-far" : "")}
+          className="st-place"
+          style={{
+            transform: `translate(${(a.x / SCENE_WIDTH) * 100}%, ${(-a.y / SCENE_HEIGHT) * 100}%)`,
+            transition: `transform ${a.moveMs}ms linear`,
+          }}
         >
-          <Overlay state={a.state} zooming={a.zooming} />
+          <div
+            className="st-place"
+            style={{
+              transformOrigin: `${(ax / SCENE_WIDTH) * 100}% ${(ay / SCENE_HEIGHT) * 100}%`,
+              transform: `scale(${a.size})`,
+              transition: `transform ${a.sizeMs}ms linear`,
+            }}
+          >
+            <div className={"st-overlay-item" + (a.zooming ? " st-overlay-far" : "")}>
+              <Overlay state={a.state} zooming={a.zooming} />
+            </div>
+          </div>
         </div>
       );
     });
@@ -376,13 +497,15 @@ const Board: React.FC<Props> = ({ data }) => {
             <FontAwesomeIcon icon={faArrowRight} />
           </nav>
         )}
-        <nav className="home-link" onClick={() => window.location.reload()}>
-          <FontAwesomeIcon icon={faRedo} />
-        </nav>
+        {!preview && (
+          <nav className="home-link" onClick={() => window.location.reload()}>
+            <FontAwesomeIcon icon={faRedo} />
+          </nav>
+        )}
       </div>
 
       {/* Status Bar */}
-      {inTrial && (
+      {inTrial && !preview && (
         <div className="status-bar">
           <div className="level-badge">
             {i18n.t("TRIAL_COUNT", { current: trialIndex + 1, total: trials })}
@@ -403,7 +526,14 @@ const Board: React.FC<Props> = ({ data }) => {
 
       {/* Category picker */}
       {phase === "category" && (
-        <CategorySelect categories={CATEGORIES} onSelect={handleCategorySelect} />
+        <CategorySelect categories={resolved.categories} onSelect={handleCategorySelect} />
+      )}
+
+      {/* Editor preview with nothing playable selected */}
+      {preview && !previewOption && (
+        <div className="st-area st-area-center">
+          <div className="st-overlay-text">Nothing to preview</div>
+        </div>
       )}
 
       {/* Trial */}
@@ -465,7 +595,7 @@ const Board: React.FC<Props> = ({ data }) => {
           <div className="st-next-row">
             {phase === "feedback" && (
               <button className="st-btn-next" onClick={handleNext}>
-                {i18n.t("NEXT")}
+                {preview ? "Replay" : i18n.t("NEXT")}
               </button>
             )}
           </div>

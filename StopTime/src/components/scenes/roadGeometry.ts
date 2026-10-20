@@ -37,3 +37,55 @@ export const roadBand = (
   ]
     .map((p) => p.join(","))
     .join(" ");
+
+// ── Single-lane POV ───────────────────────────────────────────────────────
+//
+// The "road-single-lane" scene puts the viewer in the middle of their own
+// lane of an ordinary two-lane road, so that lane fills most of the view. Its
+// edges share the vanishing point above. The oncoming lane lies beyond the
+// centre line to the left, and a narrow paved shoulder to the right.
+
+/** Half-width of the viewer's own lane at a given screen y, in viewBox units. */
+export const laneHalfWidth = (y: number): number =>
+  6 + ((y - HORIZON) / (ROAD_BOTTOM - HORIZON)) * 196;
+
+/** Width of each paved shoulder, as a multiple of the lane half-width. */
+export const SHOULDER = 0.9;
+
+/** Screen x of the right-hand lane line at a given y. */
+export const laneRightX = (y: number): number => ROAD_CENTER + laneHalfWidth(y);
+
+/** Screen x of the outer edge of the right-hand shoulder at a given y. */
+export const shoulderOuterX = (y: number): number => laneRightX(y) + SHOULDER * laneHalfWidth(y);
+
+/** Screen x of the centre line, between our lane and the oncoming one. */
+export const centerLineX = (y: number): number => ROAD_CENTER - laneHalfWidth(y);
+
+/** Screen x of the oncoming lane's edge line, on the far left. */
+export const farEdgeX = (y: number): number => ROAD_CENTER - 3 * laneHalfWidth(y);
+
+/** Screen x of the outer edge of the far-left shoulder. */
+export const farShoulderOuterX = (y: number): number => farEdgeX(y) - SHOULDER * laneHalfWidth(y);
+
+/**
+ * How large something standing at screen y is drawn, relative to the same
+ * thing at the very bottom of the view. Lets an asset size a cone or a deer
+ * for its depth.
+ */
+export const depthScale = (y: number): number => laneHalfWidth(y) / laneHalfWidth(ROAD_BOTTOM);
+
+/** A quad between two lateral offsets from the road centre, given as functions of y. */
+export const quad = (
+  yFar: number,
+  yNear: number,
+  left: (y: number) => number,
+  right: (y: number) => number
+): string =>
+  [
+    [left(yFar), yFar],
+    [right(yFar), yFar],
+    [right(yNear), yNear],
+    [left(yNear), yNear],
+  ]
+    .map((p) => p.join(","))
+    .join(" ");

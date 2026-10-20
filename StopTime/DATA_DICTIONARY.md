@@ -78,21 +78,31 @@ Changing what the activity asks means editing that file. Adding a new backdrop o
 | `display` | Reserved for a future per-option picker. Currently unused. |
 | `scene` | Must be a key in `SCENES`. An unknown scene renders a visible placeholder rather than a blank stage. |
 | `buttons` | Rendered left to right, exactly as written. `text` is used verbatim — it is **not** run through i18n, so button labels are whatever language the file is written in. |
-| `color` | `Green` (#1E8E4E), `Yellow` (#E8A200) or `Red` (#D52027) — the activity's existing palette. Any other value falls back to a neutral grey. |
+| `color` | `Green` (#1E8E4E), `Yellow` (#E8A200) or `Red` (#D52027) — the activity's existing palette. Any other value falls back to a neutral gray. |
 | `correct` | Put it on the button(s) that count as a correct answer. More than one may be marked; any of them scores as correct. An option with none marked can never be answered correctly. |
 
 ### The animation language
 
-Each line is `<seconds> <Action> [<Action Data>]`. Seconds may be fractional and are measured from the start of the trial. Lines may be written in any order; they are sorted by timestamp on load.
+Each line is `<seconds> <Action> [<Action Data>]`. Seconds may be fractional and are measured from the start of the trial. Lines may be written in any order; they are sorted by timestamp on load, and lines with the same timestamp keep their written order. The dashboard's scenario editor always keeps them in time order.
 
 | Line | Effect |
 |------|--------|
 | `<t> Asset <Name> Load` | Put `<Name>` on the stage at full size, in its registered initial state. |
 | `<t> Asset <Name> Load Zoom` | Same, but the asset zooms in from the distance over ~620ms, as though you were driving up to it. |
 | `<t> Asset <Name> Animate <state>` | Change an already-loaded asset's state. The state string is passed straight to the component. |
+| `<t> Asset <Name> Load … Location <x> <y> Size <s>` | Optional placement on Load (either part may be left out; any order after `Load`). Defaults are `Location 0 0` and `Size 1`. |
+| `<t> Asset <Name> Location <x> <y> <d>` | Glide an on-screen asset to a new location over `<d>` seconds (`0` = jump). |
+| `<t> Asset <Name> Size <s> <d>` | Resize an on-screen asset to `<s>` over `<d>` seconds (`0` = jump). `<s>` must be above 0. |
 | `<t> Asset <Name> Unload` | Take the asset off the stage. `<t> Unload <Name>` is accepted as a shorthand. |
 | `<t> Scene <name>` | Swap the backdrop mid-trial. |
 | `<t> End` | Open the response window. The buttons unlock, the prompt changes, and the decision clock starts. |
+
+**Location and size.**
+- **Location** is an offset from where the asset is normally drawn, in scene units. The scene is 500 × 400, so `x = 1` moves the asset 1/500 of the width right, and `y = 1` moves it 1/400 of the height **up**.
+- **Size** scales the whole asset (the Pedestrian's sidewalk and crossing included) around its anchor, the point where it meets the road (`anchor` in `registry.ts`), so a resized asset stays on the tarmac.
+- Anything moved or grown past the edge of the scene is clipped.
+- Location and Size glide at a constant speed and run independently of each other, of state changes, and of a Load's zoom. A Location step can move a pedestrian across the road while they walk.
+- Unloading an asset forgets its placement; loading it again starts from the Load line's values.
 
 A line that cannot be parsed — an unknown action, a missing argument, a non-numeric timestamp, an asset that is not in the registry — is skipped with a `console.warn` naming the option and the offending line. The rest of the timeline still plays, so a typo costs one step rather than the session.
 
@@ -104,8 +114,8 @@ An option with **no `End` line** would leave the participant unable to answer. R
 
 | Registry | Keys at present |
 |----------|-----------------|
-| `SCENES` | `road-normal` → `scenes/RoadNormal.tsx` |
-| `ASSETS` | `SchoolBus` (states `driving`, `amber`, `sign`), `TrafficSignal` (`green`, `yellow`, `red`), `Pedestrian` (`waiting`, `crossing`) |
+| `SCENES` | `road-normal` → `scenes/RoadNormal.tsx` (two-way road); `road-single-lane` → `scenes/RoadSingleLane.tsx` (driver's POV centred in their own lane of an ordinary two-lane US road: double yellow centre line and the oncoming lane to the left, white edge line and a narrow shoulder to the right, utility poles along the far side) |
+| `ASSETS` | `SchoolBus` (states `driving`, `amber`, `sign`), `TrafficSignal` (`green`, `yellow`, `red`), `Pedestrian` (`waiting`; `crossing`, which steps onto the crosswalk and keeps walking in place), `PoliceCar` (a generic black-and-white Ford Police Interceptor Utility; `driving`; `lights`, flashing in the lane ahead; `pulled-over`, glides onto the shoulder with lights flashing), `ConstructionZone` (`slow`, `stop` — the flagger's paddle turns over between them), `Deer` (`roadside`; `crossing`, which bounds into the lane and keeps running in place), `RailroadCrossing` (`idle`; `flashing`; `gates`, which lowers the arm across the lane) |
 
 An asset entry declares its `initialState` and may supply an `Overlay` as well as `Svg`, for assets that are not purely SVG — `TrafficSignal` draws its mast in SVG and its signal head as SimpleRT's `TrafficLight` component on a DOM layer above the stage.
 
@@ -129,7 +139,7 @@ This document describes the data emitted by the Stop Time activity via `postMess
 
 ## static_data — Accuracy Metrics
 
-Every breakdown below is **derived from whatever was in `actions.json`**, so the payload keeps up with the content file on its own. There are no hardcoded scenario or action fields.
+Every breakdown below is **derived from whatever scenarios were played**, either the activity's custom `settings.categories` or the bundled `actions.json`. The payload keeps up with the content on its own. There are no hardcoded scenario or action fields.
 
 ### Primary Outcome
 
@@ -148,6 +158,7 @@ Every breakdown below is **derived from whatever was in `actions.json`**, so the
 |-------|------|-------------|
 | `category` | string | The category the participant chose. `null` if they exited before choosing. |
 | `trials` | number | Configured number of situations. |
+| `scenario_source` | string | `"custom"` if the session played scenarios from `settings.categories`, `"built-in"` if it played the bundled `actions.json`. Option ids are only comparable between sessions that used the same scenario set. |
 
 Because the category is chosen by the participant, **it is not a randomised condition.** Comparing accuracy across categories between participants compares self-selected groups. Within a participant, repeated sessions on the same category are the comparable unit.
 
@@ -159,7 +170,7 @@ Because the category is chosen by the participant, **it is not a randomised cond
 
 The deck is dealt in shuffled blocks of the whole category, so with `trials` set to a multiple of the category size every option appears an equal number of times. A category with three options and 9 trials gives exactly 3 of each.
 
-An option-specific deficit is usually a perceptual finding rather than a cognitive one — for example, selectively poor performance on `light_yellow` and `light_green` in a participant with colour vision deficiency, since those are the only situations where the cue is carried by hue alone.
+An option-specific deficit is usually a perceptual finding rather than a cognitive one — for example, selectively poor performance on `light_yellow` and `light_green` in a participant with color vision deficiency, since those are the only situations where the cue is carried by hue alone.
 
 ### Confusion Matrix
 
@@ -225,7 +236,7 @@ The final entry in `temporal_slices` is always:
 ## Game Logic Summary
 
 1. **Instructions** modal.
-2. **Category picker.** Every category in `actions.json` is listed. The participant picks one; the deck for the whole session is dealt from that category's options.
+2. **Category picker.** Every category in the scenario set (custom `settings.categories`, or else `actions.json`) is listed. The participant picks one; the deck for the whole session is dealt from that category's options.
 3. **Trials.** Each trial plays its option's timeline. The buttons are on screen but locked, with the prompt "Watch the road...", until the `End` step fires; then they unlock, the prompt becomes "What should you do?", and the decision clock starts. There is no time limit and no timeout.
 4. **Feedback.** "Correct!" or "The right choice was …". The correct button is outlined and a wrong pick is struck through. The scene stays on screen in its final state so the situation and the answer can be seen together. The participant taps **Next**.
 5. **Completion.** A "Game Over" overlay shows the final tally, then the questionnaire, then results are sent via `postMessage`.
@@ -235,8 +246,32 @@ The final entry in `temporal_slices` is always:
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `trials` | number | `16` | Number of situations (clamped to 1–90). A multiple of the chosen category's option count keeps those options exactly balanced. |
+| `categories` | array | *(absent)* | Custom scenarios, in exactly the shape of `actions.json`. When present and usable they **replace** the bundled scenarios. When absent, empty or malformed, the bundled `actions.json` plays. Options with no correct button are skipped. Normally authored with the DriveAssist dashboard's scenario editor rather than by hand. |
 
-Timing is no longer a setting: how long each situation takes to develop is written into that option's `animations` in `actions.json`.
+Timing is not a separate setting: how long each situation takes to develop is written into that option's `animations`.
+
+Settings are read defensively. Unknown keys are ignored, so the activity plays correctly whatever a dashboard stored, including the Spin-the-Wheel settings (`low_risk`, `high_risk`, …) a stock dashboard writes for `lamp.spin_wheel`.
+
+### Deployment under `lamp.spin_wheel`
+
+On the DriveAssist server, StopTime is published as the **`lamp.spin_wheel`** spec, so any stock mindLAMP dashboard pointed at that server can launch it. Stock dashboards can play it but can't author scenarios. Only the DriveAssist dashboard has the scenario editor. Install the build by setting the spec's `executable` through the LAMP API (data only; no server change). Either inline the build:
+
+```sh
+curl -X PUT "$LAMP_SERVER/activity_spec/lamp.spin_wheel"   -u "$LAMP_USER:$LAMP_PASSWORD" -H "Content-Type: application/json"   -d "{\"executable\": \"data:text/html;base64,$(tr -d '\n' < ../dist/out/stoptime.html.b64)\"}"
+```
+
+or host `stoptime.html.b64` somewhere reachable and set `executable` to its `https:` URL. A stock dashboard that saves the activity's settings may drop `categories`. The activity then falls back to the bundled scenarios until they are re-saved from the DriveAssist dashboard.
+
+### Editor protocol
+
+The activity also answers the dashboard's editor, using messages namespaced under `lamp_editor` (see `src/components/editor.ts`). Participant launches never send these messages.
+
+| Direction | Message |
+|---|---|
+| editor → activity | `{ lamp_editor: { type: "describe", requestId } }` |
+| activity → editor | `JSON { lamp_editor: { type: "manifest", requestId, protocol: 1, manifest } }`. The manifest lists the scenes, the assets and their states, the button colors, and the bundled categories. |
+| editor → activity | `{ lamp_editor: { type: "preview", settings, target: { categoryIndex, optionIndex }, configuration } }`. Plays that one option on repeat and reports no results. |
+| activity → editor | `JSON { lamp_editor: { type: "preview_state", phase, warnings } }` |
 
 ---
 
