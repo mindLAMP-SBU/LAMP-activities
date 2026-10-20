@@ -1,52 +1,74 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faArrowRight, faRedo } from "@fortawesome/free-solid-svg-icons";
 import { InstructionModal } from "./InstructionModal";
 import { Questionnaire } from "./Questionnaire";
-import { SceneStage } from "./scenes/SceneStage";
-import { SchoolBus, BusState } from "./scenes/SchoolBus";
-import { SignalPole, SignalState } from "./scenes/TrafficSignal";
-import { Pedestrian, PedestrianState } from "./scenes/Pedestrian";
-import { TrafficLight } from "./TrafficLight";
+import { CategorySelect } from "./CategorySelect";
 import {
-  Action,
-  Cue,
-  ScenarioId,
-  ACTION_LABEL_KEY,
-  BASELINE_STATE,
-  CUES,
-  LEAD_IN_MS,
-  SCENARIO_LABEL_KEY,
+  ButtonSpec,
+  CategorySpec,
+  OptionSpec,
   buildDeck,
-} from "./scenarios";
+  cleanOption,
+  correctButtons,
+  isCorrect,
+  parseTimeline,
+  resolveSettings,
+} from "./actions";
+import { PreviewTarget, checkOption, reply } from "./editor";
+import {
+  ASSETS,
+  BUTTON_COLOR_CLASS,
+  DEFAULT_BUTTON_CLASS,
+  SCENES,
+  SCENE_HEIGHT,
+  SCENE_WIDTH,
+} from "./registry";
 import i18n from "../i18n";
 import "./StopTime.css";
 
 type Phase =
   | "instructions"
-  | "approach"   // scene coming into view, buttons locked
-  | "cue"        // situation revealed, waiting for a choice
+  | "category"
+  | "script"    // timeline running, buttons locked
+  | "answer"    // End has fired, waiting for a choice
   | "feedback"
   | "gameOver"
   | "questionnaire"
   | "done";
 
+/** One asset currently on the stage. Order is draw order. */
+interface LoadedAsset {
+  name: string;
+  state: string;
+  zooming: boolean;
+  /** Offset from where the asset is drawn, in scene units; +y is up. */
+  x: number;
+  y: number;
+  size: number;
+  /** How long the latest Location / Size change takes to play out. */
+  moveMs: number;
+  sizeMs: number;
+}
+
 interface TrialResult {
   trial: number;            // 1-indexed
-  cue_id: string;
-  scenario: ScenarioId;
-  cue_state: string;
-  correct_action: Action;
-  response: Action;
+  option: string;
+  category: string;
+  response: string;         // the button text chosen
+  correctAnswer: string;    // the button text(s) that would have been right
   correct: boolean;
-  rt: number;               // ms from the cue landing to the button press
+  rt: number;               // ms from the End step to the button press
 }
 
 interface Props {
   data: any;
+  /**
+   * Set when a dashboard editor asks for a preview: play just this option from
+   * the settings being edited, on repeat, and never report results.
+   */
+  preview?: PreviewTarget;
 }
-
-const ACTIONS: Action[] = ["continue", "slow", "stop"];
 
 function median(arr: number[]): number {
   if (arr.length === 0) return 0;
@@ -60,28 +82,37 @@ function mean(arr: number[]): number {
   return Math.round(arr.reduce((s, v) => s + v, 0) / arr.length);
 }
 
-const Board: React.FC<Props> = ({ data }) => {
-  const settings = data.activity?.settings ?? data.settings ?? {};
-  const trials = Math.max(1, Math.min(90, settings.trials ?? 16));
-  const minApproach = Math.max(300, settings.min_approach_ms ?? 800);
-  const maxApproach = Math.max(minApproach, settings.max_approach_ms ?? 1600);
+const Board: React.FC<Props> = ({ data, preview }) => {
+  const rawSettings = data.activity?.settings ?? data.settings;
+  const resolved = useMemo(() => resolveSettings(rawSettings), [rawSettings]);
+  const trials = preview ? 1 : resolved.trials;
   const language = data.configuration?.language ?? "en-US";
-  const showForward = data.forward ?? false;
-  const noBack = data.noBack ?? false;
+  const showForward = !preview && (data.forward ?? false);
+  const noBack = preview || (data.noBack ?? false);
 
-  const [phase, setPhase] = useState<Phase>("instructions");
+  // A preview indexes into the settings exactly as the editor holds them, so
+  // it reads the raw option rather than the cleaned list (which may have
+  // dropped half-written scenarios and shifted the indexes).
+  const [previewOption] = useState<OptionSpec | null>(() => {
+    if (!preview) return null;
+    const rawCategory = rawSettings?.categories?.[preview.categoryIndex];
+    return cleanOption(rawCategory?.options?.[preview.optionIndex], false);
+  });
+
+  const [phase, setPhase] = useState<Phase>(preview ? "script" : "instructions");
+  const [category, setCategory] = useState<CategorySpec | null>(null);
   const [trialIndex, setTrialIndex] = useState(0);
-  const [cue, setCue] = useState<Cue>(CUES[0]);
-  const [sceneState, setSceneState] = useState<string>(BASELINE_STATE.bus);
-  const [approaching, setApproaching] = useState(true);
-  const [chosen, setChosen] = useState<Action | null>(null);
+  const [option, setOption] = useState<OptionSpec | null>(null);
+  const [scene, setScene] = useState<string>("road-normal");
+  const [loaded, setLoaded] = useState<LoadedAsset[]>([]);
+  const [chosen, setChosen] = useState<ButtonSpec | null>(null);
   const [correctCount, setCorrectCount] = useState(0);
 
-  const deckRef = useRef<Cue[]>([]);
+  const deckRef = useRef<OptionSpec[]>([]);
   const resultsRef = useRef<TrialResult[]>([]);
   const routesRef = useRef<any[]>([]);
   const startTimeRef = useRef(Date.now());
-  const cueTimeRef = useRef(0);
+  const openedAtRef = useRef(0);
   const respondedRef = useRef(false);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -97,65 +128,132 @@ const Board: React.FC<Props> = ({ data }) => {
   useEffect(() => clearTimers, [clearTimers]);
 
   // ── Trial lifecycle ───────────────────────────────────
-  // A trial opens with the scene small and far off, rolls it up to full size,
-  // then drops the cue on it. The response clock starts at the cue, not at the
-  // start of the approach, so travel time is never counted against the answer.
+  // A trial is its option's timeline, played out on timers. Every step mutates
+  // the stage; the End step opens the response window and starts the decision
+  // clock, so time spent watching the animation is never counted against the
+  // answer.
   const startTrial = useCallback(
     (index: number) => {
       clearTimers();
       const next = deckRef.current[index];
+      if (!next) return;
+
       respondedRef.current = false;
       setChosen(null);
       setTrialIndex(index);
-      setCue(next);
-      setSceneState(BASELINE_STATE[next.scenario]);
-      setApproaching(true);
-      setPhase("approach");
+      setOption(next);
+      setScene(next.scene);
+      setLoaded([]);
+      setPhase("script");
 
-      // Let the far-away frame paint before releasing the approach transition.
-      timersRef.current.push(setTimeout(() => setApproaching(false), 50));
+      const { steps, endAt } = parseTimeline(next);
 
-      const delay = Math.round(minApproach + Math.random() * (maxApproach - minApproach));
+      steps.forEach((step) => {
+        timersRef.current.push(
+          setTimeout(() => {
+            switch (step.kind) {
+              case "load": {
+                const def = ASSETS[step.asset];
+                if (!def) {
+                  console.warn(`[StopTime] ${next.id}: unknown asset "${step.asset}"`);
+                  return;
+                }
+                setLoaded((prev) =>
+                  prev.some((a) => a.name === step.asset)
+                    ? prev
+                    : [
+                        ...prev,
+                        {
+                          name: step.asset,
+                          state: def.initialState,
+                          zooming: step.zoom,
+                          x: step.x,
+                          y: step.y,
+                          size: step.size,
+                          moveMs: 0,
+                          sizeMs: 0,
+                        },
+                      ]
+                );
+                // Let the far-away frame paint before releasing the zoom.
+                if (step.zoom) {
+                  timersRef.current.push(
+                    setTimeout(
+                      () =>
+                        setLoaded((prev) =>
+                          prev.map((a) => (a.name === step.asset ? { ...a, zooming: false } : a))
+                        ),
+                      50
+                    )
+                  );
+                }
+                return;
+              }
+              case "animate":
+                setLoaded((prev) =>
+                  prev.map((a) => (a.name === step.asset ? { ...a, state: step.state } : a))
+                );
+                return;
+              case "location":
+                setLoaded((prev) =>
+                  prev.map((a) =>
+                    a.name === step.asset ? { ...a, x: step.x, y: step.y, moveMs: step.duration } : a
+                  )
+                );
+                return;
+              case "size":
+                setLoaded((prev) =>
+                  prev.map((a) =>
+                    a.name === step.asset ? { ...a, size: step.size, sizeMs: step.duration } : a
+                  )
+                );
+                return;
+              case "unload":
+                setLoaded((prev) => prev.filter((a) => a.name !== step.asset));
+                return;
+              case "scene":
+                setScene(step.scene);
+                return;
+              case "end":
+                openedAtRef.current = performance.now();
+                setPhase("answer");
+                return;
+            }
+          }, step.at)
+        );
+      });
 
-      // A cue may declare a lead-in state it passes through first — a signal
-      // shows yellow on its way to red rather than jumping straight there. The
-      // lead-in plays out on top of the normal approach delay, so it is always
-      // seen at full size, and the response window stays shut until the real
-      // cue lands.
-      if (next.leadIn) {
-        timersRef.current.push(setTimeout(() => setSceneState(next.leadIn!), delay));
+      // Guard for a timeline whose End is missing or out of order.
+      if (!steps.some((s) => s.kind === "end")) {
+        timersRef.current.push(
+          setTimeout(() => {
+            openedAtRef.current = performance.now();
+            setPhase("answer");
+          }, endAt)
+        );
       }
-
-      timersRef.current.push(
-        setTimeout(
-          () => {
-            setSceneState(next.state);
-            cueTimeRef.current = performance.now();
-            setPhase("cue");
-          },
-          next.leadIn ? delay + LEAD_IN_MS : delay
-        )
-      );
     },
-    [clearTimers, minApproach, maxApproach]
+    [clearTimers]
   );
 
   const handleAnswer = useCallback(
-    (response: Action) => {
-      if (respondedRef.current) return;
+    (button: ButtonSpec) => {
+      if (respondedRef.current || !option || !category) return;
       respondedRef.current = true;
       clearTimers();
 
-      const rt = Math.round(performance.now() - cueTimeRef.current);
-      const correct = response === cue.answer;
+      const rt = Math.round(performance.now() - openedAtRef.current);
+      const correct = isCorrect(option, button);
+      const correctAnswer = correctButtons(option)
+        .map((b) => b.text)
+        .join(" / ");
 
       const result: TrialResult = {
         trial: resultsRef.current.length + 1,
-        cue_id: cue.id,
-        scenario: cue.scenario,
-        cue_state: cue.state,
-        correct_action: cue.answer,
-        response,
+        option: option.id,
+        category: category.category,
+        response: button.text,
+        correctAnswer,
         correct,
         rt,
       };
@@ -163,21 +261,25 @@ const Board: React.FC<Props> = ({ data }) => {
       routesRef.current.push({
         duration: rt,
         item: result.trial,
-        level: cue.scenario,
+        level: category.category,
         type: correct,
-        value: response,
-        cue: cue.id,
-        correct_action: cue.answer,
+        value: button.text,
+        option: option.id,
+        correct_answer: correctAnswer,
       });
 
       if (correct) setCorrectCount((c) => c + 1);
-      setChosen(response);
+      setChosen(button);
       setPhase("feedback");
     },
-    [cue, clearTimers]
+    [option, category, clearTimers]
   );
 
   const handleNext = useCallback(() => {
+    if (preview) {
+      startTrial(0);
+      return;
+    }
     const next = trialIndex + 1;
     if (next >= trials) {
       setPhase("gameOver");
@@ -185,7 +287,7 @@ const Board: React.FC<Props> = ({ data }) => {
     } else {
       startTrial(next);
     }
-  }, [trialIndex, trials, startTrial]);
+  }, [preview, trialIndex, trials, startTrial]);
 
   // ── Results payload ───────────────────────────────────
   const buildPayload = useCallback(
@@ -194,27 +296,24 @@ const Board: React.FC<Props> = ({ data }) => {
       const correct = all.filter((r) => r.correct);
       const rts = correct.map((r) => r.rt);
 
-      const byScenario: any = {};
-      (["bus", "light", "ped"] as ScenarioId[]).forEach((s) => {
-        const rows = all.filter((r) => r.scenario === s);
-        byScenario[s + "_correct"] = rows.filter((r) => r.correct).length;
-        byScenario[s + "_total"] = rows.length;
+      // Breakdowns are derived from whatever is actually in actions.json, so
+      // the payload keeps up with the content file on its own.
+      const byOption: Record<string, { correct: number; total: number }> = {};
+      all.forEach((r) => {
+        const row = byOption[r.option] ?? { correct: 0, total: 0 };
+        row.total += 1;
+        if (r.correct) row.correct += 1;
+        byOption[r.option] = row;
       });
 
-      const byAction: any = {};
-      ACTIONS.forEach((a) => {
-        const rows = all.filter((r) => r.correct_action === a);
-        byAction[a + "_correct"] = rows.filter((r) => r.correct).length;
-        byAction[a + "_total"] = rows.length;
-      });
-
-      // How the wrong answers went wrong. A key of "stop>slow" means the
-      // situation called for a stop but only a slow down was chosen.
+      // How the wrong answers went wrong, keyed "<right button>><chosen button>".
+      // Derived from the button text in actions.json, so it needs no knowledge
+      // of what the buttons happen to say.
       const confusions: Record<string, number> = {};
       all
         .filter((r) => !r.correct)
         .forEach((r) => {
-          const key = r.correct_action + ">" + r.response;
+          const key = r.correctAnswer + ">" + r.response;
           confusions[key] = (confusions[key] ?? 0) + 1;
         });
 
@@ -231,28 +330,26 @@ const Board: React.FC<Props> = ({ data }) => {
           score,
           point: score >= 80 ? 2 : 1,
           accuracy: score,
-          // Per-scenario and per-action breakdowns
-          ...byScenario,
-          ...byAction,
+          category: category?.category ?? null,
+          by_option: byOption,
           confusion_matrix: confusions,
           // Decision speed: reported for analysis, not folded into the score
           mean_decision_ms: mean(rts),
           median_decision_ms: median(rts),
           mean_decision_all_ms: mean(all.map((r) => r.rt)),
-          // Settings echo
           trials,
-          min_approach_ms: minApproach,
-          max_approach_ms: maxApproach,
+          scenario_source: resolved.source,
           ...(qData && { questionnaire: qData }),
         },
         temporal_slices: routesRef.current,
       };
     },
-    [trials, minApproach, maxApproach]
+    [trials, category, resolved.source]
   );
 
   const sendResult = useCallback(
     (isNav: boolean, isBack: boolean, qData?: any) => {
+      if (preview) return;
       const payload: any = {
         ...buildPayload(qData),
         ...(showForward && { forward: !isBack }),
@@ -261,8 +358,26 @@ const Board: React.FC<Props> = ({ data }) => {
       };
       parent.postMessage(JSON.stringify(payload), "*");
     },
-    [buildPayload, showForward]
+    [preview, buildPayload, showForward]
   );
+
+  // ── Editor preview ────────────────────────────────────
+  useEffect(() => {
+    if (!preview || !previewOption) return;
+    deckRef.current = [previewOption];
+    setCategory({ category: "", options: [previewOption] });
+    startTrial(0);
+    // Mount only: the editor remounts the board for every new preview.
+  }, []);
+
+  useEffect(() => {
+    if (!preview) return;
+    reply(null, {
+      type: "preview_state",
+      phase: previewOption ? phase : "empty",
+      warnings: previewOption ? checkOption(previewOption) : ["nothing to preview"],
+    });
+  }, [preview, previewOption, phase]);
 
   // ── Navigation ────────────────────────────────────────
   const handleBack = () => {
@@ -278,11 +393,17 @@ const Board: React.FC<Props> = ({ data }) => {
   };
 
   const handleInstructionClose = () => {
+    setPhase("category");
+  };
+
+  const handleCategorySelect = (picked: CategorySpec) => {
     startTimeRef.current = Date.now();
-    deckRef.current = buildDeck(trials);
+    deckRef.current = buildDeck(picked.options, trials);
     resultsRef.current = [];
     routesRef.current = [];
     setCorrectCount(0);
+    setCategory(picked);
+    // startTrial reads deckRef, which is already filled.
     startTrial(0);
   };
 
@@ -293,31 +414,73 @@ const Board: React.FC<Props> = ({ data }) => {
   };
 
   // ── Render ────────────────────────────────────────────
-  const inTrial = phase === "approach" || phase === "cue" || phase === "feedback";
-  const canAnswer = phase === "cue";
-  const isCorrect = chosen !== null && chosen === cue.answer;
+  const inTrial = phase === "script" || phase === "answer" || phase === "feedback";
+  const canAnswer = phase === "answer";
+  const answeredCorrectly = chosen !== null && chosen.correct === true;
 
-  const renderScene = (): React.ReactNode => {
-    switch (cue.scenario) {
-      case "bus":
-        return <SchoolBus state={sceneState as BusState} approaching={approaching} />;
-      case "light":
-        return <SignalPole approaching={approaching} />;
-      case "ped":
-        return <Pedestrian state={sceneState as PedestrianState} approaching={approaching} />;
-      default:
-        return null;
-    }
-  };
+  const Scene = SCENES[scene];
 
-  // The signal head is the SimpleRT traffic light, so it is a DOM node rather
-  // than SVG and rides on top of the stage, hanging off the pole drawn above.
-  const renderOverlay = (): React.ReactNode =>
-    cue.scenario === "light" ? (
-      <div className="st-signal-head">
-        <TrafficLight state={sceneState as SignalState} />
-      </div>
-    ) : null;
+  // Location and Size wrap the asset in two layers, moved and scaled
+  // separately so each glides over its own duration. They sit outside the
+  // asset's own approach zoom, so a zoom plays out wherever the asset is put.
+  const sceneSvg = loaded.map((a) => {
+    const def = ASSETS[a.name];
+    if (!def) return null;
+    const [ax, ay] = def.anchor;
+    return (
+      <g
+        key={a.name}
+        style={{
+          transform: `translate(${a.x}px, ${-a.y}px)`,
+          transition: `transform ${a.moveMs}ms linear`,
+        }}
+      >
+        <g
+          style={{
+            transformBox: "view-box",
+            transformOrigin: `${ax}px ${ay}px`,
+            transform: `scale(${a.size})`,
+            transition: `transform ${a.sizeMs}ms linear`,
+          }}
+        >
+          <def.Svg state={a.state} zooming={a.zooming} />
+        </g>
+      </g>
+    );
+  });
+
+  // Assets that are not purely SVG contribute a DOM layer over the stage. Each
+  // gets its own wrapper so it can zoom independently of the others.
+  const sceneOverlay = loaded
+    .filter((a) => ASSETS[a.name]?.Overlay)
+    .map((a) => {
+      const Overlay = ASSETS[a.name].Overlay!;
+      const [ax, ay] = ASSETS[a.name].anchor;
+      // The same two layers as the SVG, in percentages of the stage.
+      return (
+        <div
+          key={a.name}
+          className="st-place"
+          style={{
+            transform: `translate(${(a.x / SCENE_WIDTH) * 100}%, ${(-a.y / SCENE_HEIGHT) * 100}%)`,
+            transition: `transform ${a.moveMs}ms linear`,
+          }}
+        >
+          <div
+            className="st-place"
+            style={{
+              transformOrigin: `${(ax / SCENE_WIDTH) * 100}% ${(ay / SCENE_HEIGHT) * 100}%`,
+              transform: `scale(${a.size})`,
+              transition: `transform ${a.sizeMs}ms linear`,
+            }}
+          >
+            <div className={"st-overlay-item" + (a.zooming ? " st-overlay-far" : "")}>
+              <Overlay state={a.state} zooming={a.zooming} />
+            </div>
+          </div>
+        </div>
+      );
+    });
 
   return (
     <div className="game-shell">
@@ -334,13 +497,15 @@ const Board: React.FC<Props> = ({ data }) => {
             <FontAwesomeIcon icon={faArrowRight} />
           </nav>
         )}
-        <nav className="home-link" onClick={() => window.location.reload()}>
-          <FontAwesomeIcon icon={faRedo} />
-        </nav>
+        {!preview && (
+          <nav className="home-link" onClick={() => window.location.reload()}>
+            <FontAwesomeIcon icon={faRedo} />
+          </nav>
+        )}
       </div>
 
       {/* Status Bar */}
-      {inTrial && (
+      {inTrial && !preview && (
         <div className="status-bar">
           <div className="level-badge">
             {i18n.t("TRIAL_COUNT", { current: trialIndex + 1, total: trials })}
@@ -359,50 +524,69 @@ const Board: React.FC<Props> = ({ data }) => {
         />
       )}
 
+      {/* Category picker */}
+      {phase === "category" && (
+        <CategorySelect categories={resolved.categories} onSelect={handleCategorySelect} />
+      )}
+
+      {/* Editor preview with nothing playable selected */}
+      {preview && !previewOption && (
+        <div className="st-area st-area-center">
+          <div className="st-overlay-text">Nothing to preview</div>
+        </div>
+      )}
+
       {/* Trial */}
-      {inTrial && (
+      {inTrial && option && (
         <div className="st-area">
-          <SceneStage
-            label={i18n.t(SCENARIO_LABEL_KEY[cue.scenario])}
-            overlay={renderOverlay()}
-            approaching={approaching}
-          >
-            {renderScene()}
-          </SceneStage>
+          {Scene ? (
+            <Scene label={i18n.t("ROAD_SCENE")} overlay={sceneOverlay.length ? sceneOverlay : undefined}>
+              {sceneSvg}
+            </Scene>
+          ) : (
+            <div className="st-stage st-stage-missing">{`Unknown scene "${scene}"`}</div>
+          )}
 
           <div className="st-prompt-row">
-            {phase === "approach" && (
+            {phase === "script" && (
               <div className="st-prompt st-prompt-wait">{i18n.t("WATCH_ROAD")}</div>
             )}
-            {phase === "cue" && <div className="st-prompt">{i18n.t("WHAT_SHOULD_YOU_DO")}</div>}
+            {phase === "answer" && <div className="st-prompt">{i18n.t("WHAT_SHOULD_YOU_DO")}</div>}
             {phase === "feedback" && (
-              <div className={"st-prompt " + (isCorrect ? "st-prompt-right" : "st-prompt-wrong")}>
-                {isCorrect
+              <div
+                className={"st-prompt " + (answeredCorrectly ? "st-prompt-right" : "st-prompt-wrong")}
+              >
+                {answeredCorrectly
                   ? i18n.t("CORRECT")
                   : i18n.t("CORRECT_ANSWER_WAS", {
-                      action: i18n.t(ACTION_LABEL_KEY[cue.answer]),
+                      action: correctButtons(option)
+                        .map((b) => b.text)
+                        .join(" / "),
                     })}
               </div>
             )}
           </div>
 
           <div className="st-actions">
-            {ACTIONS.map((action) => {
-              const classes = ["st-btn", "st-btn-" + action];
+            {option.buttons.map((button, i) => {
+              const classes = [
+                "st-btn",
+                BUTTON_COLOR_CLASS[button.color?.toLowerCase()] ?? DEFAULT_BUTTON_CLASS,
+              ];
               if (!canAnswer) classes.push("st-btn-locked");
               if (phase === "feedback") {
-                if (action === cue.answer) classes.push("st-btn-answer");
-                if (action === chosen && !isCorrect) classes.push("st-btn-wrong");
+                if (button.correct) classes.push("st-btn-answer");
+                if (button === chosen && !answeredCorrectly) classes.push("st-btn-wrong");
               }
               return (
                 <button
-                  key={action}
+                  key={`${button.text}-${i}`}
                   type="button"
                   className={classes.join(" ")}
                   disabled={!canAnswer}
-                  onClick={() => handleAnswer(action)}
+                  onClick={() => handleAnswer(button)}
                 >
-                  {i18n.t(ACTION_LABEL_KEY[action])}
+                  {button.text}
                 </button>
               );
             })}
@@ -411,7 +595,7 @@ const Board: React.FC<Props> = ({ data }) => {
           <div className="st-next-row">
             {phase === "feedback" && (
               <button className="st-btn-next" onClick={handleNext}>
-                {i18n.t("NEXT")}
+                {preview ? "Replay" : i18n.t("NEXT")}
               </button>
             )}
           </div>

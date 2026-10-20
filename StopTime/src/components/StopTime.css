@@ -118,6 +118,57 @@
 .st-flash-a { animation: st-blink 1s steps(1, end) infinite; }
 .st-flash-b { animation: st-blink 1s steps(1, end) infinite; animation-delay: 0.5s; }
 
+/* ── Pedestrian walk cycle ──────────────────────────── */
+/* Limbs swing from the top of their own box (hip or shoulder). The two
+   phases are half a stride apart, and each arm swings with the opposite leg. */
+@keyframes st-swing {
+  from { transform: rotate(22deg); }
+  to { transform: rotate(-22deg); }
+}
+@keyframes st-bob {
+  from { transform: translateY(0); }
+  to { transform: translateY(-2.5px); }
+}
+.st-walk-limb {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: st-swing 0.45s ease-in-out infinite alternate;
+}
+.st-walk-b { animation-delay: -0.45s; }
+.st-walk-body { animation: st-bob 0.225s ease-in-out infinite alternate; }
+
+/* ── Deer gallop ────────────────────────────────────── */
+/* The pedestrian's walk cycle, run faster, with a deeper bound. */
+.st-gallop { animation-duration: 0.22s; }
+.st-gallop.st-walk-b { animation-delay: -0.22s; }
+.st-gallop-body { animation-duration: 0.11s; }
+
+/* ── Police lights ──────────────────────────────────── */
+/* The PoliceCarAsset prototype's double-burst: red flashes twice, then blue
+   twice, each lamp snapping between lit and nearly dark. The lit lens is only
+   drawn while the lights are on; a dim lens is always drawn beneath it. */
+@keyframes st-pc-red {
+  0%, 12% { opacity: 1; }
+  12%, 25% { opacity: 0.07; }
+  25%, 37% { opacity: 1; }
+  37%, 100% { opacity: 0.07; }
+}
+@keyframes st-pc-blue {
+  0%, 50% { opacity: 0.07; }
+  50%, 62% { opacity: 1; }
+  62%, 75% { opacity: 0.07; }
+  75%, 87% { opacity: 1; }
+  87%, 100% { opacity: 0.07; }
+}
+.st-pc-red { fill: #ff2a3d; filter: drop-shadow(0 0 7px #ff2a3d); animation: st-pc-red 0.8s steps(1) infinite; }
+.st-pc-blue { fill: #2f74ff; filter: drop-shadow(0 0 7px #2f74ff); animation: st-pc-blue 0.8s steps(1) infinite; }
+.st-pc-red.st-pc-alt, .st-pc-blue.st-pc-alt { animation-delay: 0.1s; }
+.st-pc-glow-red { animation: st-pc-red 0.8s steps(1) infinite; }
+.st-pc-glow-blue { animation: st-pc-blue 0.8s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .st-pc-red, .st-pc-blue, .st-pc-glow-red, .st-pc-glow-blue { animation-duration: 3s; }
+}
+
 /* ── Traffic Signal Head ────────────────────────────── */
 /* The signal is SimpleRT's TrafficLight component, so it is DOM rather than
    SVG and has to ride on top of the stage. Its transform mirrors
@@ -126,15 +177,25 @@
 .st-overlay {
   position: absolute;
   inset: 0;
+  pointer-events: none;
+}
+/* The Location and Size layers around an overlay, the DOM twin of the <g>
+   layers Board wraps around each asset's SVG. */
+.st-place {
+  position: absolute;
+  inset: 0;
+}
+.st-overlay-item {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 12%;
-  pointer-events: none;
   transform-origin: 50% 84%;
   transition: transform 620ms cubic-bezier(0.22, 0.7, 0.3, 1), opacity 320ms ease-out;
 }
-.st-overlay-far {
+.st-overlay-item.st-overlay-far {
   transform: scale(0.34) translateY(6%);
   opacity: 0.75;
 }
@@ -229,9 +290,11 @@
   transform: translateY(2px);
   filter: brightness(0.92);
 }
-.st-btn-continue { background: #1E8E4E; }
-.st-btn-slow     { background: #E8A200; color: #3d2a00; }
-.st-btn-stop     { background: #D52027; }
+.st-btn-green   { background: #1E8E4E; }
+.st-btn-yellow  { background: #E8A200; color: #3d2a00; }
+.st-btn-red     { background: #D52027; }
+/* Fallback for a color actions.json names that we do not know. */
+.st-btn-neutral { background: #5A5A5F; }
 
 /* Locked while the road is still coming into view. */
 .st-btn-locked {
@@ -288,6 +351,55 @@
   font-size: 24px;
   font-weight: 700;
   color: #1a1a2e;
+}
+
+/* ── Category Picker ────────────────────────────────── */
+.st-category-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 24px;
+  margin: 0 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+.st-category-title {
+  font-size: 21px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 20px;
+}
+.st-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.st-category-btn {
+  width: 100%;
+  border: 2px solid #D52027;
+  border-radius: 12px;
+  background: #fff;
+  color: #D52027;
+  padding: 16px 12px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.st-category-btn:hover {
+  background: #D52027;
+  color: #fff;
+}
+
+/* Shown when actions.json names a scene the registry does not have. */
+.st-stage-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a8f96;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 /* ── Instruction Modal ──────────────────────────────── */
@@ -420,6 +532,10 @@
 /* Honour reduced-motion: the approach is decorative, but the lamp flashing is
    part of the cue, so it is deliberately left running. */
 @media (prefers-reduced-motion: reduce) {
-  .st-subject, .st-overlay { transition: none; }
+  .st-subject, .st-overlay-item { transition: none; }
+  /* A held mid-stride pose instead of the walk cycle. */
+  .st-walk-limb, .st-walk-body { animation: none; }
+  .st-walk-a { transform: rotate(16deg); }
+  .st-walk-b { transform: rotate(-14deg); }
   .st-prompt-wait { animation: none; opacity: 0.8; }
 }

@@ -1,11 +1,11 @@
 import React from "react";
-import { ROAD_CENTER, roadHalfWidth } from "./SceneStage";
+import { ROAD_CENTER, roadHalfWidth } from "./roadGeometry";
 
 /**
  * A marked crossing with someone beside it.
  *
  *   waiting  — waiting on the sidewalk beside the crossing → SLOW DOWN
- *   crossing — stepped out onto the crosswalk            → STOP
+ *   crossing — stepped out onto the crosswalk, walking   → STOP
  *
  * Two states by design. Somebody standing by a crossing is reason enough to be
  * ready to slow, so there is no case here where continuing at speed is right.
@@ -107,45 +107,54 @@ export const Pedestrian: React.FC<Props> = ({ state, approaching }) => {
           transition: "transform 0.7s cubic-bezier(0.34, 1.1, 0.64, 1)",
         }}
       >
-        {/* legs */}
-        {crossing ? (
-          <>
-            <rect x="-15" y="-36" width="11" height="34" rx="4" fill={COLORS.trousers} transform="rotate(16 -9 -36)" />
-            <rect x="3" y="-36" width="11" height="34" rx="4" fill={COLORS.trousers} transform="rotate(-14 9 -36)" />
-            <rect x="-24" y="-5" width="16" height="7" rx="3" fill={COLORS.shoe} />
-            <rect x="9" y="-5" width="16" height="7" rx="3" fill={COLORS.shoe} />
-          </>
-        ) : (
-          <>
-            <rect x="-11" y="-36" width="10" height="34" rx="4" fill={COLORS.trousers} />
-            <rect x="1" y="-36" width="10" height="34" rx="4" fill={COLORS.trousers} />
-            <rect x="-13" y="-4" width="13" height="6" rx="3" fill={COLORS.shoe} />
-            <rect x="0" y="-4" width="13" height="6" rx="3" fill={COLORS.shoe} />
-          </>
-        )}
+        {/* A walk cycle while crossing: each leg (with its shoe) and each arm
+            swings from the hip or shoulder, arms against legs, and the body
+            bobs at each step. See .st-walk-* in StopTime.css. */}
+        <g className={crossing ? "st-walk-body" : undefined}>
+          {/* legs */}
+          {crossing ? (
+            <>
+              <g className="st-walk-limb st-walk-a">
+                <rect x="-14" y="-36" width="10" height="34" rx="4" fill={COLORS.trousers} />
+                <rect x="-18" y="-5" width="15" height="7" rx="3" fill={COLORS.shoe} />
+              </g>
+              <g className="st-walk-limb st-walk-b">
+                <rect x="4" y="-36" width="10" height="34" rx="4" fill={COLORS.trousers} />
+                <rect x="3" y="-5" width="15" height="7" rx="3" fill={COLORS.shoe} />
+              </g>
+            </>
+          ) : (
+            <>
+              <rect x="-11" y="-36" width="10" height="34" rx="4" fill={COLORS.trousers} />
+              <rect x="1" y="-36" width="10" height="34" rx="4" fill={COLORS.trousers} />
+              <rect x="-13" y="-4" width="13" height="6" rx="3" fill={COLORS.shoe} />
+              <rect x="0" y="-4" width="13" height="6" rx="3" fill={COLORS.shoe} />
+            </>
+          )}
 
-        {/* torso */}
-        <rect x="-14" y="-75" width="28" height="42" rx="9" fill={COLORS.coat} />
-        <rect x="-14" y="-75" width="9" height="42" rx="5" fill={COLORS.coatDark} opacity="0.55" />
+          {/* torso */}
+          <rect x="-14" y="-75" width="28" height="42" rx="9" fill={COLORS.coat} />
+          <rect x="-14" y="-75" width="9" height="42" rx="5" fill={COLORS.coatDark} opacity="0.55" />
 
-        {/* arms */}
-        {crossing ? (
-          <>
-            <rect x="-22" y="-72" width="9" height="30" rx="4" fill={COLORS.coatDark} transform="rotate(-22 -17 -72)" />
-            <rect x="13" y="-72" width="9" height="30" rx="4" fill={COLORS.coatDark} transform="rotate(20 17 -72)" />
-          </>
-        ) : (
-          <>
-            <rect x="-22" y="-72" width="9" height="32" rx="4" fill={COLORS.coatDark} />
-            <rect x="13" y="-72" width="9" height="32" rx="4" fill={COLORS.coatDark} />
-            {/* a bag, held while waiting */}
-            <rect x="-30" y="-42" width="14" height="16" rx="3" fill={COLORS.bag} />
-          </>
-        )}
+          {/* arms */}
+          {crossing ? (
+            <>
+              <rect className="st-walk-limb st-walk-b" x="-22" y="-72" width="9" height="30" rx="4" fill={COLORS.coatDark} />
+              <rect className="st-walk-limb st-walk-a" x="13" y="-72" width="9" height="30" rx="4" fill={COLORS.coatDark} />
+            </>
+          ) : (
+            <>
+              <rect x="-22" y="-72" width="9" height="32" rx="4" fill={COLORS.coatDark} />
+              <rect x="13" y="-72" width="9" height="32" rx="4" fill={COLORS.coatDark} />
+              {/* a bag, held while waiting */}
+              <rect x="-30" y="-42" width="14" height="16" rx="3" fill={COLORS.bag} />
+            </>
+          )}
 
-        {/* head */}
-        <circle cx="0" cy="-88" r="11" fill={COLORS.skin} />
-        <path d="M-11 -90 a11 11 0 0 1 22 0 a11 6 0 0 0 -22 0 z" fill={COLORS.hair} />
+          {/* head */}
+          <circle cx="0" cy="-88" r="11" fill={COLORS.skin} />
+          <path d="M-11 -90 a11 11 0 0 1 22 0 a11 6 0 0 0 -22 0 z" fill={COLORS.hair} />
+        </g>
       </g>
     </g>
   );
