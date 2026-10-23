@@ -12,7 +12,7 @@ export interface LineZone {
 }
 
 const DOUBLE_LENGTH: [number, number] = [400, 900];
-const DASHED_LENGTH: [number, number] = [250, 600];
+const DASHED_LENGTH: [number, number] = [900, 1500];
 
 const randBetween = ([min, max]: [number, number]) => min + Math.random() * (max - min);
 

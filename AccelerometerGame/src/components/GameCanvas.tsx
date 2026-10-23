@@ -14,7 +14,9 @@ const ROAD_STRIP_LENGTH = 12.5
 const CAR_WIDTH = 25
 const CAR_LENGTH = 40
 const TREE_SIZE = 40
-const TREE_HITBOX_INSET = 8 // Shrinks the tree hitbox so brushing the image edge isn't a crash
+const TREE_HITBOX_INSET = 8
+const CAR_HITBOX_INSET_X = 5
+const CAR_HITBOX_INSET_Y = 2
 
 // Tilt-to-throttle tuning
 const MIN_SPEED = 0.75
@@ -248,6 +250,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             s.p3 = rot(s.x + CAR_WIDTH, s.y + CAR_LENGTH);
             s.p4 = rot(s.x, s.y + CAR_LENGTH);
             const playerPoly = [s.p1, s.p2, s.p3, s.p4];
+            const playerHitbox = rectPoints(s.x + CAR_HITBOX_INSET_X, s.y + CAR_HITBOX_INSET_Y, CAR_WIDTH - 2 * CAR_HITBOX_INSET_X, CAR_LENGTH - 2 * CAR_HITBOX_INSET_Y)
+                .map((pt) => rot(pt.x, pt.y));
 
             // Move world
             s.distance += s.speedY;
@@ -276,7 +280,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             // Collisions
             for (const car of s.cars)
             {
-                if (polygonsIntersect(playerPoly, rectPoints(car.x, toScreenY(car.z), CAR_WIDTH, CAR_LENGTH)))
+                const carHitbox = rectPoints(car.x + CAR_HITBOX_INSET_X, toScreenY(car.z) + CAR_HITBOX_INSET_Y, CAR_WIDTH - 2 * CAR_HITBOX_INSET_X, CAR_LENGTH - 2 * CAR_HITBOX_INSET_Y);
+                if (polygonsIntersect(playerHitbox, carHitbox))
                 {
                     endGame(car.kind);
                     return;
