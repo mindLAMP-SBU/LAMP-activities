@@ -12,11 +12,19 @@ import i18n from "../i18n";
 import "./Board.css";
 import Arrow from "src/icons/Arrow";
 import GameCanvas from "./GameCanvas";
-import useOrientationLock, { tryNativeLock } from "../hooks/useOrientationLock";
+import useOrientationLock, { getScreenAngle, tryNativeLock } from "../hooks/useOrientationLock";
 
 
 /** Largest gap between samples still treated as continuous motion, in ms. */
 const MAX_STEP_MS = 250;
+
+/** Smoothing factor for the gravity-based pitch (0..1, higher = more responsive). */
+const PITCH_SMOOTHING = 0.15;
+/** How long the phone's starting pitch is sampled to define "neutral", in ms. */
+const PITCH_CALIBRATION_MS = 500;
+
+/** Wrap an angle in degrees to [-180, 180). */
+const wrap180 = (deg: number) => ((deg + 180) % 360 + 360) % 360 - 180;
 
 /**
  * Integrate a rotation rate (deg/s) over dt (ms) into an angle in [-180, 180),
@@ -51,15 +59,47 @@ const Board: React.FC<Props> = ({ data }) => {
   // refs
   const startedAtRef = useRef(0);
   const theta = useRef(0);
-  const beta = useRef(0);
+  // Forward/back tilt in degrees relative to how the phone was held at start
+  // (positive = tilted forward). Derived from gravity, so it doesn't drift.
+  const pitch = useRef(0);
+  const pitchCalibRef = useRef({
+    filtered: null as number | null,
+    neutral: null as number | null,
+    startedAt: 0,
+    sign: 1,
+  });
   const lastSampleAtRef = useRef(0);
   const seenRef = useRef(0);
   const appliedRef = useRef(0);
   const lastDtRef = useRef(0);
 
-  // use rotation rates to update the angles theta (gamma) and beta
+  // Low-pass filter the gravity vector into a pitch angle, relative to the calibrated neutral
+  const updatePitch = useCallback((s: MotionSample) => {
+    const g = s.accelerationIncludingGravity;
+    if (g.x === null || g.z === null) return;
+
+    // In landscape the long (y) axis is horizontal, so forward/back tilt moves gravity between x and z
+    const raw = (Math.atan2(g.x, g.z) * 180) / Math.PI;
+    const c = pitchCalibRef.current;
+    c.filtered = c.filtered === null ? raw : wrap180(c.filtered + wrap180(raw - c.filtered) * PITCH_SMOOTHING);
+
+    if (c.neutral === null) {
+      if (c.startedAt === 0) {
+        c.startedAt = s.t;
+        // Make "forward" mean the same thing on either landscape side
+        c.sign = getScreenAngle() === 270 ? -1 : 1;
+      }
+      if (s.t - c.startedAt < PITCH_CALIBRATION_MS) return;
+      c.neutral = c.filtered;
+    }
+    pitch.current = wrap180(c.filtered - c.neutral) * c.sign;
+  }, []);
+
+  // use rotation rate to update the angle theta (gamma), and gravity to update pitch
   const integrateRotation = useCallback((s: MotionSample) => {
-    const { gamma, beta: betaRate } = s.rotationRate;
+    updatePitch(s);
+
+    const gamma = s.rotationRate.gamma;
     const prevT = lastSampleAtRef.current;
     lastSampleAtRef.current = s.t;
     seenRef.current += 1;
@@ -68,12 +108,11 @@ const Board: React.FC<Props> = ({ data }) => {
     if (dt > MAX_STEP_MS) dt = 0;
 
     lastDtRef.current = dt;
-    if ((gamma === null && betaRate === null) || dt <= 0) return;
+    if (gamma === null || dt <= 0) return;
     appliedRef.current += 1;
 
-    if (gamma !== null) theta.current = integrateAngle(theta.current, gamma, dt);
-    if (betaRate !== null) beta.current = integrateAngle(beta.current, betaRate, dt);
-  }, []);
+    theta.current = integrateAngle(theta.current, gamma, dt);
+  }, [updatePitch]);
 
   // Only listen while the readout is on screen.
   const motion = useDeviceMotion({
@@ -100,6 +139,8 @@ const Board: React.FC<Props> = ({ data }) => {
   // iOS 13+ requires requestPermission() to be reached synchronously from a user gesture
   const handleInstructionClose = useCallback(() => {
     startedAtRef.current = Date.now();
+    pitch.current = 0;
+    pitchCalibRef.current = { filtered: null, neutral: null, startedAt: 0, sign: 1 };
     motion.requestPermission();
     tryNativeLock();
     setPhase("playing");
@@ -171,7 +212,7 @@ const Board: React.FC<Props> = ({ data }) => {
       {phase === "playing" && (
         <div className="activity-area">
           {orientationLock.size && (
-            <GameCanvas rotation={theta} beta={beta} height={orientationLock.size.h - 52} width={orientationLock.size.w}/>
+            <GameCanvas rotation={theta} pitch={pitch} height={orientationLock.size.h - 52} width={orientationLock.size.w}/>
           )}
         </div>
       )}

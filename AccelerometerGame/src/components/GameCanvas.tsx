@@ -11,11 +11,19 @@ const ROAD_STRIP_GAP = 100
 const CAR_WIDTH = 50
 const CAR_LENGTH = 80
 
+// Tilt-to-throttle tuning
+const MIN_SPEED = 1.5
+const BASE_SPEED = 3
+const MAX_SPEED = 7
+const DEAD_ZONE_DEG = 4
+const MAX_TILT_DEG = 25
+const SPEED_EASE = 0.05 // Fraction of the gap to the target speed closed each frame (car inertia)
+
 interface GameCanvasProps {
     width?: number;
     height?: number;
     rotation: MutableRefObject<number>;
-    beta: MutableRefObject<number>;
+    pitch: MutableRefObject<number>;
 }
 
 const COLORS = {
@@ -33,7 +41,7 @@ interface Actor {
     image: HTMLCanvasElement | null;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rotation, beta }) => {
+const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rotation, pitch }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Game state lives in a ref so updating it never triggers a React re-render
@@ -41,7 +49,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         x: width/2 - CAR_WIDTH/2, 
         y: height - 150, 
         roadYOffset: 0,
-        speedY: 4,
+        speedY: BASE_SPEED,
         // Car rotation in radians
         angle: 0,
         // Points reperesenting the car
@@ -84,7 +92,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
                     {
                         treeImage = img;
                         
-                        for (let j = 0; j < 10 && height/10 * j < height + 100; j++)
+                        for (let j = 0; j < 10 && height/8 * j < height + 100; j++)
                         {
                             let x1 = Math.floor(Math.random() * (roadLeftBound + 1));
                             let x2 = Math.floor(Math.random() * (width - roadRightBound -50)) + roadRightBound;
@@ -115,7 +123,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             s.angle = rad;
 
             // Update speed to match tilt of phone
-            s.speedY = 3 + 3 * (Math.sin(-1 * beta.current * Math.PI) / 180);
+            const p = pitch.current;
+            let t = Math.min(1, Math.max(0, Math.abs(p) - DEAD_ZONE_DEG) / (MAX_TILT_DEG - DEAD_ZONE_DEG));
+            t = Math.sign(p) * t * t; // ease in for finer control near neutral
+            const targetSpeed = t > 0
+                ? BASE_SPEED + t * (MAX_SPEED - BASE_SPEED)
+                : BASE_SPEED + t * (BASE_SPEED - MIN_SPEED);
+            s.speedY += (targetSpeed - s.speedY) * SPEED_EASE;
 
             // Move car
             s.x += sin * 4
