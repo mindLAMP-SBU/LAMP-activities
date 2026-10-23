@@ -87,7 +87,7 @@ const Board: React.FC<Props> = ({ data }) => {
       if (c.startedAt === 0) {
         c.startedAt = s.t;
         // Make "forward" mean the same thing on either landscape side
-        c.sign = getScreenAngle() === 270 ? -1 : 1;
+        c.sign = getScreenAngle() === 270 ? 1 : -1;
       }
       if (s.t - c.startedAt < PITCH_CALIBRATION_MS) return;
       c.neutral = c.filtered;

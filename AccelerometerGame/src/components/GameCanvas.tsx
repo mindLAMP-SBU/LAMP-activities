@@ -162,7 +162,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             {
                 actor.y += s.speedY;
                 if (actor.y > height)
-                    actor.y = -100;
+                    actor.y = -70;
             }
         };
 
