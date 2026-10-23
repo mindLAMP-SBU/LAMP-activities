@@ -30,7 +30,8 @@ const COLORS = {
     road: "#5a5a5f",
     grass: "#afc990",
     roadStripes: "yellow",
-    car: "#3f7ef3"
+    car: "#3f7ef3",
+    car2: "#f3423f"
 }
 
 interface Actor {
@@ -38,6 +39,8 @@ interface Actor {
     y: number;
     dx?: number;
     dy?: number;
+    width?: number;
+    height?: number;
     image: HTMLCanvasElement | null;
 }
 
@@ -58,6 +61,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         p3: {x: 0, y: 0},
         p4: {x: 0, y: 0},
 
+        environmentActors: [] as Actor[],
         actors: [] as Actor[],
     });
 
@@ -81,6 +85,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         svgToRaster(<Car fill={COLORS.car} />, CAR_WIDTH * dpr, CAR_LENGTH * dpr)
             .then((img) => { if (!cancelled) carImage = img; })
             .catch((err) => console.error(err));
+
+        let carImage2: HTMLCanvasElement | null = null;
+        svgToRaster(<Car fill={COLORS.car2} />, CAR_WIDTH * dpr, CAR_LENGTH * dpr)
+            .then((img) => { 
+                carImage2 = img;
+                stateRef.current.actors.push({x: stateRef.current.x, y: 100, dy: BASE_SPEED, image: carImage2})
+             })
+            .catch((err) => console.error(err));
         
         const roadLeftBound = width/2 - ROAD_WIDTH/2 - 30;
         const roadRightBound = width/2 + ROAD_WIDTH/2 ;
@@ -97,16 +109,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
                             let x1 = Math.floor(Math.random() * (roadLeftBound + 1));
                             let x2 = Math.floor(Math.random() * (width - roadRightBound -25)) + roadRightBound;
                             let y = height/10 * j;
-                            stateRef.current.actors.push({x: x1, y: y, image: treeImage})
-                            stateRef.current.actors.push({x: x2, y: y, image: treeImage})
+                            stateRef.current.environmentActors.push({x: x1, y: y, image: treeImage})
+                            stateRef.current.environmentActors.push({x: x2, y: y, image: treeImage})
 
                             if (j % 3 == 0)
                             {
-                                stateRef.current.actors.push({x: x1-50, y: y-5, image: treeImage})
+                                stateRef.current.environmentActors.push({x: x1-50, y: y-5, image: treeImage})
                             }
                             if (j % 3 == 1)
                             {
-                                stateRef.current.actors.push({x: x2+50, y: y-5, image: treeImage})
+                                stateRef.current.environmentActors.push({x: x2+50, y: y-5, image: treeImage})
                             }
                         }
                     } 
@@ -158,11 +170,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             if (s.roadYOffset > height)
                 s.roadYOffset = s.roadYOffset % ROAD_STRIP_GAP;
 
-            for (let actor of s.actors)
+            for (let actor of s.environmentActors)
             {
                 actor.y += s.speedY;
                 if (actor.y > height)
                     actor.y = -35;
+            }
+
+            for (let actor of s.actors)
+            {
+                actor.y += s.speedY - actor.dy!;
             }
         };
 
@@ -184,12 +201,22 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             }
 
             // Trees
-            for (let actor of s.actors)
+            for (let actor of s.environmentActors)
             {   
                 if (actor.image)
                 {
                     ctx.save();
                     ctx.drawImage(actor.image, actor.x, actor.y);
+                    ctx.restore();
+                }
+            }
+            
+            for (let actor of s.actors)
+            {   
+                if (actor.image)
+                {
+                    ctx.save();
+                    ctx.drawImage(actor.image, actor.x, actor.y, CAR_WIDTH, CAR_LENGTH);
                     ctx.restore();
                 }
             }
