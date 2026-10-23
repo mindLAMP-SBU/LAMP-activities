@@ -1,4 +1,6 @@
 import React, { MutableRefObject, useEffect, useRef } from "react";
+import Car from "../icons/Car";
+import { svgToRaster } from "../utils/svgToRaster";
 
 const FPS = 60;
 const FRAME_INTERVAL = 1000 / FPS;
@@ -20,6 +22,8 @@ const COLORS = {
     car: "#3f7ef3"
 }
 
+
+
 const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rotation }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -28,6 +32,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         x: width/2 - CAR_WIDTH/2, 
         y: height - 150, 
         roadYOffset: 0,
+        // Car rotation in radians
+        angle: 0,
         // Points reperesenting the car
         p1: {x: 0, y: 0},
         p2: {x: 0, y: 0},
@@ -49,12 +55,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         canvas.style.height = `${height}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+        // Assets
+        let carImage: HTMLCanvasElement | null = null;
+        let cancelled = false;
+        svgToRaster(<Car fill={COLORS.car} />, CAR_WIDTH * dpr, CAR_LENGTH * dpr)
+            .then((img) => { if (!cancelled) carImage = img; })
+            .catch((err) => console.error(err));
+
         const update = () => {
             const s = stateRef.current;
 
             const rad = (-1 * rotation.current * Math.PI) / 180;
             const cos = Math.cos(rad);
             const sin = Math.sin(rad);
+            s.angle = rad;
 
             // Move car
             s.x += sin * 4
@@ -101,16 +115,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
                 ctx.fillRect(width/2 -2.5, i * ROAD_STRIP_GAP + s.roadYOffset - height, 5, 25);
             }
             
-            // Placeholder for car
-            ctx.fillStyle = COLORS.car;
-            ctx.beginPath();
-            ctx.moveTo(s.p1.x, s.p1.y);
-            ctx.lineTo(s.p2.x, s.p2.y);
-            ctx.lineTo(s.p3.x, s.p3.y);
-            ctx.lineTo(s.p4.x, s.p4.y);
-            ctx.closePath();
-            ctx.fill();
-
+            // Car
+            if (carImage) {
+                ctx.save();
+                ctx.translate(s.x + CAR_WIDTH / 2, s.y + CAR_LENGTH / 2);
+                ctx.rotate(s.angle);
+                ctx.drawImage(carImage, -CAR_WIDTH / 2, -CAR_LENGTH / 2, CAR_WIDTH, CAR_LENGTH);
+                ctx.restore();
+            }
         };
 
         let animationId: number;
@@ -131,7 +143,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         draw(); // draw the first frame right away
         animationId = requestAnimationFrame(loop);
 
-        return () => cancelAnimationFrame(animationId);
+        return () => {
+            cancelled = true;
+            cancelAnimationFrame(animationId);
+        };
     }, [width, height]);
 
     return (
