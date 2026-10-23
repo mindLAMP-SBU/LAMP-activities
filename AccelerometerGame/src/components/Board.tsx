@@ -12,6 +12,7 @@ import i18n from "../i18n";
 import "./Board.css";
 import Arrow from "src/icons/Arrow";
 import GameCanvas from "./GameCanvas";
+import useOrientationLock, { tryNativeLock } from "../hooks/useOrientationLock";
 
 
 /** Largest gap between samples still treated as continuous motion, in ms. */
@@ -72,6 +73,9 @@ const Board: React.FC<Props> = ({ data }) => {
     onSample: integrateGamma,
   });
 
+  // Keep the view fixed to the device if the OS rotates the screen mid-game
+  const orientationLock = useOrientationLock(phase === "playing");
+
   // localization
   useEffect(() => {
     i18n.changeLanguage(language);
@@ -89,6 +93,7 @@ const Board: React.FC<Props> = ({ data }) => {
   const handleInstructionClose = useCallback(() => {
     startedAtRef.current = Date.now();
     motion.requestPermission();
+    tryNativeLock();
     setPhase("playing");
   }, [motion.requestPermission]);
 
@@ -124,7 +129,7 @@ const Board: React.FC<Props> = ({ data }) => {
 
   
   return (
-    <div className="game-shell">
+    <div className="game-shell" style={orientationLock.style}>
       {/* Header */}
       <div className="heading">
         <span className="back-link" onClick={() => post({ clickBack: true })}>
@@ -157,7 +162,9 @@ const Board: React.FC<Props> = ({ data }) => {
       {/* Playing — the activity's own UI goes here. */}
       {phase === "playing" && (
         <div className="activity-area">
-          <GameCanvas rotation={theta} height={window.innerHeight - 52} width={window.innerWidth}/>
+          {orientationLock.size && (
+            <GameCanvas rotation={theta} height={orientationLock.size.h - 52} width={orientationLock.size.w}/>
+          )}
         </div>
       )}
 
