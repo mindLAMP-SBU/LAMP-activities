@@ -18,6 +18,16 @@ import useOrientationLock, { tryNativeLock } from "../hooks/useOrientationLock";
 /** Largest gap between samples still treated as continuous motion, in ms. */
 const MAX_STEP_MS = 250;
 
+/**
+ * Integrate a rotation rate (deg/s) over dt (ms) into an angle in [-180, 180),
+ * decaying toward 0 to counter gyro drift.
+ */
+const integrateAngle = (angle: number, rate: number, dt: number) => {
+  let t = angle + (rate * dt) / 1000;
+  t -= t * 0.5 * (dt / 1000);
+  return ((t + 180) % 360 + 360) % 360 - 180;
+};
+
 // Activity-specific phases go between "playing" and "questionnaire".
 type Phase = "instructions" | "playing" | "questionnaire" | "done";
 
@@ -41,16 +51,15 @@ const Board: React.FC<Props> = ({ data }) => {
   // refs
   const startedAtRef = useRef(0);
   const theta = useRef(0);
+  const beta = useRef(0);
   const lastSampleAtRef = useRef(0);
-  // Diagnostics: how many samples reached the integrator, and how many of
-  // those actually moved theta. Rendered below the arrow.
   const seenRef = useRef(0);
   const appliedRef = useRef(0);
   const lastDtRef = useRef(0);
 
-  // use rotation rate to update the angle theta
-  const integrateGamma = useCallback((s: MotionSample) => {
-    const gamma = s.rotationRate.gamma;
+  // use rotation rates to update the angles theta (gamma) and beta
+  const integrateRotation = useCallback((s: MotionSample) => {
+    const { gamma, beta: betaRate } = s.rotationRate;
     const prevT = lastSampleAtRef.current;
     lastSampleAtRef.current = s.t;
     seenRef.current += 1;
@@ -59,18 +68,17 @@ const Board: React.FC<Props> = ({ data }) => {
     if (dt > MAX_STEP_MS) dt = 0;
 
     lastDtRef.current = dt;
-    if (gamma === null || dt <= 0) return;
+    if ((gamma === null && betaRate === null) || dt <= 0) return;
     appliedRef.current += 1;
 
-    let t = theta.current + (gamma * dt) / 1000;
-    t -= t * 0.5 * (dt / 1000);
-    theta.current = ((t + 180) % 360 + 360) % 360 - 180;
+    if (gamma !== null) theta.current = integrateAngle(theta.current, gamma, dt);
+    if (betaRate !== null) beta.current = integrateAngle(beta.current, betaRate, dt);
   }, []);
 
   // Only listen while the readout is on screen.
   const motion = useDeviceMotion({
     enabled: phase === "playing",
-    onSample: integrateGamma,
+    onSample: integrateRotation,
   });
 
   // Keep the view fixed to the device if the OS rotates the screen mid-game
@@ -163,7 +171,7 @@ const Board: React.FC<Props> = ({ data }) => {
       {phase === "playing" && (
         <div className="activity-area">
           {orientationLock.size && (
-            <GameCanvas rotation={theta} height={orientationLock.size.h - 52} width={orientationLock.size.w}/>
+            <GameCanvas rotation={theta} beta={beta} height={orientationLock.size.h - 52} width={orientationLock.size.w}/>
           )}
         </div>
       )}

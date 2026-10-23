@@ -15,6 +15,7 @@ interface GameCanvasProps {
     width?: number;
     height?: number;
     rotation: MutableRefObject<number>;
+    beta: MutableRefObject<number>;
 }
 
 const COLORS = {
@@ -32,7 +33,7 @@ interface Actor {
     image: HTMLCanvasElement | null;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rotation }) => {
+const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rotation, beta }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Game state lives in a ref so updating it never triggers a React re-render
@@ -112,6 +113,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             const cos = Math.cos(rad);
             const sin = Math.sin(rad);
             s.angle = rad;
+
+            // Update speed to match tilt of phone
+            if (beta.current > 15)
+            {
+                s.speedY = 3 + 3 * (Math.sin((beta.current-15) * Math.PI) / 180);
+            }
+            else
+                s.speedY = 3;
 
             // Move car
             s.x += sin * 4
