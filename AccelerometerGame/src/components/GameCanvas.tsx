@@ -115,12 +115,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             s.angle = rad;
 
             // Update speed to match tilt of phone
-            if (beta.current > 15)
-            {
-                s.speedY = 3 + 3 * (Math.sin((beta.current-15) * Math.PI) / 180);
-            }
-            else
-                s.speedY = 3;
+            s.speedY = 3 + 3 * (Math.sin(-1 * beta.current * Math.PI) / 180);
 
             // Move car
             s.x += sin * 4
