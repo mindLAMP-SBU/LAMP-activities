@@ -9,7 +9,11 @@ const resources = {
     translation: {
       GAME: "Sensor Activity",
       INSTRUCTIONS:
-        "This activity requires your phone to be in landscape position. Please rotate your phone before pressing start.",
+        "This activity requires your phone to be in landscape position. Please rotate your phone before pressing start. " +
+        "Rotate your phone to steer, and tilt it forward or back to speed up or slow down. " +
+        "Pass the car in front of you, but only cross the centre line where it is dashed, never over a double yellow line. " +
+        "Watch out for oncoming cars, and don't hit any cars or trees.",
+      WARNING_DOUBLE_YELLOW: "No passing on a double yellow line!",
       GAME_OVER: "Game Over",
       PERMISSION: "Grant accelerometer permission",
       PERMISSION_DENIED:

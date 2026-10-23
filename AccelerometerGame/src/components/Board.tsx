@@ -11,7 +11,7 @@ import useDeviceMotion, { MotionSample } from "../hooks/useDeviceMotion";
 import i18n from "../i18n";
 import "./Board.css";
 import Arrow from "src/icons/Arrow";
-import GameCanvas from "./GameCanvas";
+import GameCanvas, { GameEvent, GameResult } from "./GameCanvas";
 import useOrientationLock, { getScreenAngle, tryNativeLock } from "../hooks/useOrientationLock";
 
 
@@ -53,11 +53,16 @@ const Board: React.FC<Props> = ({ data }) => {
   const language =
     settings.current.language ?? data.configuration?.language ?? data.language ?? "en-US";
 
+  // Number of successful passes that completes the game
+  const rounds: number = settings.current.rounds ?? 3;
+
   // state
   const [phase, setPhase] = useState<Phase>("instructions");
 
   // refs
   const startedAtRef = useRef(0);
+  const eventsRef = useRef<GameEvent[]>([]);
+  const resultRef = useRef<GameResult | null>(null);
   const theta = useRef(0);
   // Forward/back tilt in degrees relative to how the phone was held at start
   // (positive = tilted forward). Derived from gravity, so it doesn't drift.
@@ -140,6 +145,8 @@ const Board: React.FC<Props> = ({ data }) => {
   const handleInstructionClose = useCallback(() => {
     startedAtRef.current = Date.now();
     pitch.current = 0;
+    eventsRef.current = [];
+    resultRef.current = null;
     pitchCalibRef.current = { filtered: null, neutral: null, startedAt: 0, sign: 1 };
     motion.requestPermission();
     tryNativeLock();
@@ -151,6 +158,15 @@ const Board: React.FC<Props> = ({ data }) => {
     setPhase("questionnaire");
   }, []);
 
+  const handleGameEvent = useCallback((event: GameEvent) => {
+    eventsRef.current.push(event);
+  }, []);
+
+  const handleGameOver = useCallback((result: GameResult) => {
+    resultRef.current = result;
+    finishActivity();
+  }, [finishActivity]);
+
   // send results via mindlamp api
   const sendResults = useCallback(
     (questionnaire: any) => {
@@ -158,22 +174,43 @@ const Board: React.FC<Props> = ({ data }) => {
         ? Date.now() - startedAtRef.current
         : 0;
 
+      const result = resultRef.current;
+      const crashWith = result && result.reason !== "complete" ? result.reason : null;
+
+      // One slice per gameplay event; duration is the time since the previous event
+      let prevT = startedAtRef.current;
+      const slices = eventsRef.current.map((e) => {
+        const slice = {
+          item: e.type,
+          type: e.detail ?? null,
+          value: e.round,
+          level: e.round,
+          duration: prevT ? e.t - prevT : 0,
+        };
+        prevT = e.t;
+        return slice;
+      });
+
       setPhase("done");
       post({
         duration,
         done: true,
         static_data: {
           duration,
-          // Activity-specific scores go here.
+          rounds,
+          passes: result?.passes ?? 0,
+          illegal_crossings: result?.violations ?? 0,
+          crashed: crashWith !== null,
+          crash_with: crashWith,
           questionnaire,
         },
         temporal_slices: [
-          // Activity-specific per-event entries go here.
+          ...slices,
           { item: "exit", type: "manual_exit", value: false, duration: 0 },
         ],
       });
     },
-    [post]
+    [post, rounds]
   );
 
   
@@ -212,7 +249,16 @@ const Board: React.FC<Props> = ({ data }) => {
       {phase === "playing" && (
         <div className="activity-area">
           {orientationLock.size && (
-            <GameCanvas rotation={theta} pitch={pitch} height={orientationLock.size.h - 52} width={orientationLock.size.w}/>
+            <GameCanvas
+              rotation={theta}
+              pitch={pitch}
+              height={orientationLock.size.h - 52}
+              width={orientationLock.size.w}
+              rounds={rounds}
+              warningText={i18n.t("WARNING_DOUBLE_YELLOW")}
+              onEvent={handleGameEvent}
+              onGameOver={handleGameOver}
+            />
           )}
         </div>
       )}

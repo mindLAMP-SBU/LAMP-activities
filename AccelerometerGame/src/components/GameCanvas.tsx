@@ -2,14 +2,19 @@ import React, { MutableRefObject, useEffect, useRef } from "react";
 import Car from "../icons/Car";
 import { svgToRaster } from "../utils/svgToRaster";
 import Tree from "src/icons/Tree";
+import { Point, polygonsIntersect, rectPoints } from "../game/collision";
+import { createZones, drawCenterLine, isDoubleBetween, LineZone, updateZones } from "../game/road";
 
 const FPS = 60;
 const FRAME_INTERVAL = 1000 / FPS;
 
 const ROAD_WIDTH = 80;
 const ROAD_STRIP_GAP = 50
+const ROAD_STRIP_LENGTH = 12.5
 const CAR_WIDTH = 25
 const CAR_LENGTH = 40
+const TREE_SIZE = 40
+const TREE_HITBOX_INSET = 8 // Shrinks the tree hitbox so brushing the image edge isn't a crash
 
 // Tilt-to-throttle tuning
 const MIN_SPEED = 0.75
@@ -19,11 +24,40 @@ const DEAD_ZONE_DEG = 4
 const MAX_TILT_DEG = 25
 const SPEED_EASE = 0.05 // Fraction of the gap to the target speed closed each frame (car inertia)
 
+// Traffic tuning
+const LEAD_SPEED = 1.2 // Slightly slower than BASE_SPEED so the player catches up
+const ONCOMING_SPEED = -1.0
+const ONCOMING_INTERVAL_FRAMES: [number, number] = [3 * FPS, 8 * FPS]
+const PASS_MARGIN = 10 // How far past the lead car the player must be to count a pass
+const GAME_OVER_DELAY_MS = 1500
+
+export type GameEventType = "pass" | "illegal_crossing" | "crash";
+export type GameOverReason = "complete" | "lead" | "oncoming" | "tree";
+
+export interface GameEvent {
+    type: GameEventType;
+    t: number;
+    round: number;
+    detail?: string;
+}
+
+export interface GameResult {
+    reason: GameOverReason;
+    passes: number;
+    violations: number;
+}
+
 interface GameCanvasProps {
     width?: number;
     height?: number;
     rotation: MutableRefObject<number>;
     pitch: MutableRefObject<number>;
+    /** Number of successful passes that completes the game. */
+    rounds: number;
+    /** Shown in the bottom-right while the player is over a double yellow line. */
+    warningText: string;
+    onEvent?: (event: GameEvent) => void;
+    onGameOver?: (result: GameResult) => void;
 }
 
 const COLORS = {
@@ -31,39 +65,42 @@ const COLORS = {
     grass: "#afc990",
     roadStripes: "yellow",
     car: "#3f7ef3",
-    car2: "#f3423f"
+    car2: "#f3423f",
+    car3: "#9b59b6",
+    warning: "rgba(213, 32, 39, 0.9)",
+    crash: "rgba(213, 32, 39, 0.5)",
 }
 
 interface Actor {
     x: number;
     y: number;
-    dx?: number;
-    dy?: number;
-    width?: number;
-    height?: number;
     image: HTMLCanvasElement | null;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rotation, pitch }) => {
+/** A car on the road. `z` is the world distance of its top edge on screen. */
+interface CarActor {
+    kind: "lead" | "oncoming";
+    x: number;
+    z: number;
+    speed: number;
+    /** Set once the player has passed this lead car. */
+    passed?: boolean;
+}
+
+const randBetween = ([min, max]: [number, number]) => min + Math.random() * (max - min);
+
+const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rotation, pitch, rounds, warningText, onEvent, onGameOver }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // Game state lives in a ref so updating it never triggers a React re-render
-    const stateRef = useRef({
-        x: width/2 + 10, 
-        y: height - 75, 
-        roadYOffset: 0,
-        speedY: BASE_SPEED,
-        // Car rotation in radians
-        angle: 0,
-        // Points reperesenting the car
-        p1: {x: 0, y: 0},
-        p2: {x: 0, y: 0},
-        p3: {x: 0, y: 0},
-        p4: {x: 0, y: 0},
-
-        environmentActors: [] as Actor[],
-        actors: [] as Actor[],
-    });
+    // Read through refs so the game loop doesn't restart when these change
+    const roundsRef = useRef(rounds);
+    roundsRef.current = rounds;
+    const warningTextRef = useRef(warningText);
+    warningTextRef.current = warningText;
+    const onEventRef = useRef(onEvent);
+    onEventRef.current = onEvent;
+    const onGameOverRef = useRef(onGameOver);
+    onGameOverRef.current = onGameOver;
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -79,56 +116,102 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         canvas.style.height = `${height}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+        const centerX = width / 2;
+        const rightLaneX = centerX + 10;
+        const leftLaneX = centerX - ROAD_WIDTH / 2 + 5;
+
+        // Game state lives in the effect so updating it never triggers a React re-render
+        const s = {
+            x: rightLaneX,
+            y: height - 75,
+            speedY: BASE_SPEED,
+            // Total distance driven; world z maps to screen y via toScreenY
+            distance: 0,
+            // Car rotation in radians
+            angle: 0,
+            // Points reperesenting the car
+            p1: {x: 0, y: 0} as Point,
+            p2: {x: 0, y: 0} as Point,
+            p3: {x: 0, y: 0} as Point,
+            p4: {x: 0, y: 0} as Point,
+
+            environmentActors: [] as Actor[],
+            cars: [] as CarActor[],
+            zones: [] as LineZone[],
+            framesUntilOncoming: randBetween(ONCOMING_INTERVAL_FRAMES),
+
+            passes: 0,
+            violations: 0,
+            illegal: false,
+            over: null as GameOverReason | null,
+            overAt: 0,
+            reported: false,
+        };
+
+        const toScreenY = (z: number) => s.y - (z - s.distance);
+        // World distance at the top of the screen
+        const zTop = () => s.distance + s.y;
+
+        s.zones = createZones(s.distance);
+        s.cars.push({ kind: "lead", x: rightLaneX, z: s.distance + height * 0.6, speed: LEAD_SPEED });
+
+        const emit = (type: GameEventType, detail?: string) => {
+            onEventRef.current?.({ type, t: Date.now(), round: s.passes + 1, detail });
+        };
+
+        const endGame = (reason: GameOverReason) => {
+            s.over = reason;
+            s.overAt = performance.now();
+            s.illegal = false;
+            if (reason !== "complete") emit("crash", reason);
+        };
+
         // Assets
-        let carImage: HTMLCanvasElement | null = null;
+        const images: Record<"player" | "lead" | "oncoming", HTMLCanvasElement | null> = {
+            player: null,
+            lead: null,
+            oncoming: null,
+        };
         let cancelled = false;
-        svgToRaster(<Car fill={COLORS.car} />, CAR_WIDTH * dpr, CAR_LENGTH * dpr)
-            .then((img) => { if (!cancelled) carImage = img; })
-            .catch((err) => console.error(err));
+        const loadCar = (key: keyof typeof images, fill: string) =>
+            svgToRaster(<Car fill={fill} />, CAR_WIDTH * dpr, CAR_LENGTH * dpr)
+                .then((img) => { if (!cancelled) images[key] = img; })
+                .catch((err) => console.error(err));
+        loadCar("player", COLORS.car);
+        loadCar("lead", COLORS.car2);
+        loadCar("oncoming", COLORS.car3);
 
-        let carImage2: HTMLCanvasElement | null = null;
-        svgToRaster(<Car fill={COLORS.car2} />, CAR_WIDTH * dpr, CAR_LENGTH * dpr)
-            .then((img) => { 
-                carImage2 = img;
-                stateRef.current.actors.push({x: stateRef.current.x, y: 100, dy: BASE_SPEED, image: carImage2})
-             })
-            .catch((err) => console.error(err));
-        
-        const roadLeftBound = width/2 - ROAD_WIDTH/2 - 30;
-        const roadRightBound = width/2 + ROAD_WIDTH/2 ;
+        // Keep trees fully off the road and its white edge
+        const roadLeftBound = centerX - ROAD_WIDTH/2 - TREE_SIZE - 5;
+        const roadRightBound = centerX + ROAD_WIDTH/2 + 5;
 
-        let treeImage: HTMLCanvasElement | null = null;
-        svgToRaster(<Tree />, 40, 40)
-            .then((img) => { 
+        svgToRaster(<Tree />, TREE_SIZE, TREE_SIZE)
+            .then((treeImage) => {
                 if (!cancelled)
                     {
-                        treeImage = img;
-                        
                         for (let j = 0; j < 10 && height/8 * j < height + 50; j++)
                         {
                             let x1 = Math.floor(Math.random() * (roadLeftBound + 1));
                             let x2 = Math.floor(Math.random() * (width - roadRightBound -25)) + roadRightBound;
                             let y = height/10 * j;
-                            stateRef.current.environmentActors.push({x: x1, y: y, image: treeImage})
-                            stateRef.current.environmentActors.push({x: x2, y: y, image: treeImage})
+                            s.environmentActors.push({x: x1, y: y, image: treeImage})
+                            s.environmentActors.push({x: x2, y: y, image: treeImage})
 
                             if (j % 3 == 0)
                             {
-                                stateRef.current.environmentActors.push({x: x1-50, y: y-5, image: treeImage})
+                                s.environmentActors.push({x: x1-50, y: y-5, image: treeImage})
                             }
                             if (j % 3 == 1)
                             {
-                                stateRef.current.environmentActors.push({x: x2+50, y: y-5, image: treeImage})
+                                s.environmentActors.push({x: x2+50, y: y-5, image: treeImage})
                             }
                         }
-                    } 
+                    }
                  })
             .catch((err) => console.error(err));
-        
+
 
         const update = () => {
-            const s = stateRef.current;
-
             const rad = (-1 * rotation.current * Math.PI) / 180;
             const cos = Math.cos(rad);
             const sin = Math.sin(rad);
@@ -164,11 +247,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             s.p2 = rot(s.x + CAR_WIDTH, s.y);
             s.p3 = rot(s.x + CAR_WIDTH, s.y + CAR_LENGTH);
             s.p4 = rot(s.x, s.y + CAR_LENGTH);
+            const playerPoly = [s.p1, s.p2, s.p3, s.p4];
 
-            // Move background
-            s.roadYOffset += s.speedY;
-            if (s.roadYOffset > height)
-                s.roadYOffset = s.roadYOffset % ROAD_STRIP_GAP;
+            // Move world
+            s.distance += s.speedY;
+            updateZones(s.zones, s.distance - height, zTop() + height);
 
             for (let actor of s.environmentActors)
             {
@@ -177,58 +260,141 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
                     actor.y = -35;
             }
 
-            for (let actor of s.actors)
+            for (const car of s.cars)
+                car.z += car.speed;
+            // Drop cars that are fully below the screen
+            s.cars = s.cars.filter((car) => toScreenY(car.z) < height);
+
+            // Oncoming traffic
+            s.framesUntilOncoming -= 1;
+            if (s.framesUntilOncoming <= 0)
             {
-                actor.y += s.speedY - actor.dy!;
+                s.cars.push({ kind: "oncoming", x: leftLaneX, z: zTop() + CAR_LENGTH + 10, speed: ONCOMING_SPEED });
+                s.framesUntilOncoming = randBetween(ONCOMING_INTERVAL_FRAMES);
+            }
+
+            // Collisions
+            for (const car of s.cars)
+            {
+                if (polygonsIntersect(playerPoly, rectPoints(car.x, toScreenY(car.z), CAR_WIDTH, CAR_LENGTH)))
+                {
+                    endGame(car.kind);
+                    return;
+                }
+            }
+            const treeHitbox = TREE_SIZE - 2 * TREE_HITBOX_INSET;
+            for (const tree of s.environmentActors)
+            {
+                if (polygonsIntersect(playerPoly, rectPoints(tree.x + TREE_HITBOX_INSET, tree.y + TREE_HITBOX_INSET, treeHitbox, treeHitbox)))
+                {
+                    endGame("tree");
+                    return;
+                }
+            }
+
+            // Crossing the centre line is only allowed where it is dashed
+            const overCenter = playerPoly.some((pt) => pt.x < centerX);
+            const illegal = overCenter && isDoubleBetween(s.zones, s.distance - CAR_LENGTH, s.distance);
+            if (illegal && !s.illegal)
+            {
+                s.violations += 1;
+                emit("illegal_crossing");
+            }
+            s.illegal = illegal;
+
+            // A pass counts once the player is ahead of the lead car and back in their own lane
+            const lead = s.cars.find((car) => car.kind === "lead" && !car.passed);
+            const inOwnLane = playerPoly.every((pt) => pt.x > centerX);
+            if (lead && inOwnLane && s.distance - CAR_LENGTH > lead.z + PASS_MARGIN)
+            {
+                lead.passed = true;
+                emit("pass");
+                s.passes += 1;
+                if (s.passes >= roundsRef.current)
+                {
+                    endGame("complete");
+                    return;
+                }
+                s.cars.push({ kind: "lead", x: rightLaneX, z: zTop() + CAR_LENGTH + 20, speed: LEAD_SPEED });
             }
         };
 
+        const drawCar = (image: HTMLCanvasElement | null, x: number, y: number, angle: number) => {
+            if (!image) return;
+            ctx.save();
+            ctx.translate(x + CAR_WIDTH / 2, y + CAR_LENGTH / 2);
+            ctx.rotate(angle);
+            ctx.drawImage(image, -CAR_WIDTH / 2, -CAR_LENGTH / 2, CAR_WIDTH, CAR_LENGTH);
+            ctx.restore();
+        };
+
+        const drawWarning = (text: string) => {
+            const padding = 8;
+            const margin = 10;
+            const radius = 8;
+            ctx.font = "bold 13px sans-serif";
+            const w = ctx.measureText(text).width + padding * 2;
+            const h = 13 + padding * 2;
+            const x = width - margin - w;
+            const y = height - margin - h;
+
+            ctx.fillStyle = COLORS.warning;
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.arcTo(x + w, y, x + w, y + h, radius);
+            ctx.arcTo(x + w, y + h, x, y + h, radius);
+            ctx.arcTo(x, y + h, x, y, radius);
+            ctx.arcTo(x, y, x + w, y, radius);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "white";
+            ctx.textBaseline = "middle";
+            ctx.fillText(text, x + padding, y + h / 2);
+        };
+
         const draw = () => {
-            const s = stateRef.current;
             ctx.clearRect(0, 0, width, height);
 
             // Background
             ctx.fillStyle = COLORS.grass;
             ctx.fillRect(0, 0, width, height);
             ctx.fillStyle = "white";
-            ctx.fillRect(width/2 - (ROAD_WIDTH/2+2.5), 0, ROAD_WIDTH+5, height);
+            ctx.fillRect(centerX - (ROAD_WIDTH/2+2.5), 0, ROAD_WIDTH+5, height);
             ctx.fillStyle = COLORS.road;
-            ctx.fillRect(width/2 - ROAD_WIDTH/2, 0, ROAD_WIDTH, height);
-            ctx.fillStyle = COLORS.roadStripes;
-            for (let i = 0; i < 40; i++)
-            {
-                ctx.fillRect(width/2 -1.25, i * ROAD_STRIP_GAP + s.roadYOffset - height, 2.5, 12.5);
-            }
+            ctx.fillRect(centerX - ROAD_WIDTH/2, 0, ROAD_WIDTH, height);
+            drawCenterLine(ctx, s.zones, centerX, zTop() - height, zTop(), toScreenY, COLORS.roadStripes, ROAD_STRIP_GAP, ROAD_STRIP_LENGTH);
 
             // Trees
             for (let actor of s.environmentActors)
-            {   
+            {
                 if (actor.image)
-                {
-                    ctx.save();
                     ctx.drawImage(actor.image, actor.x, actor.y);
-                    ctx.restore();
-                }
             }
-            
-            for (let actor of s.actors)
-            {   
-                if (actor.image)
-                {
-                    ctx.save();
-                    ctx.drawImage(actor.image, actor.x, actor.y, CAR_WIDTH, CAR_LENGTH);
-                    ctx.restore();
-                }
+
+            // Traffic
+            for (const car of s.cars)
+                drawCar(images[car.kind], car.x, toScreenY(car.z), car.kind === "oncoming" ? Math.PI : 0);
+
+            // Player
+            drawCar(images.player, s.x, s.y, s.angle);
+
+            if (s.over && s.over !== "complete")
+            {
+                ctx.fillStyle = COLORS.crash;
+                ctx.beginPath();
+                ctx.arc(s.x + CAR_WIDTH / 2, s.y + CAR_LENGTH / 2, CAR_LENGTH, 0, Math.PI * 2);
+                ctx.fill();
             }
-            
-            // Car
-            if (carImage) {
-                ctx.save();
-                ctx.translate(s.x + CAR_WIDTH / 2, s.y + CAR_LENGTH / 2);
-                ctx.rotate(s.angle);
-                ctx.drawImage(carImage, -CAR_WIDTH / 2, -CAR_LENGTH / 2, CAR_WIDTH, CAR_LENGTH);
-                ctx.restore();
-            }
+
+            // HUD: progress and rule warning
+            ctx.font = "bold 14px sans-serif";
+            ctx.textBaseline = "top";
+            ctx.fillStyle = "white";
+            ctx.fillText(`${s.passes}/${roundsRef.current}`, 10, 10);
+
+            if (s.illegal)
+                drawWarning(warningTextRef.current);
         };
 
         let animationId: number;
@@ -242,8 +408,17 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
 
             lastTime = now - (elapsed % FRAME_INTERVAL);
 
-            update();
+            if (!s.over)
+                update();
             draw();
+
+            // Hold the final frame briefly before handing off to the questionnaire
+            if (s.over && !s.reported && now - s.overAt > GAME_OVER_DELAY_MS)
+            {
+                s.reported = true;
+                cancelAnimationFrame(animationId);
+                onGameOverRef.current?.({ reason: s.over, passes: s.passes, violations: s.violations });
+            }
         };
 
         draw(); // draw the first frame right away
