@@ -83,11 +83,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
                     {
                         treeImage = img;
                         
-                        for (let j = 0; j < 10; j++)
+                        for (let j = 0; j < 10 && height/10 * j < height + 100; j++)
                         {
                             let x1 = Math.floor(Math.random() * (roadLeftBound + 1));
                             let x2 = Math.floor(Math.random() * (width - roadRightBound -50)) + roadRightBound;
-                            let y = width/10 * j;
+                            let y = height/10 * j;
                             stateRef.current.actors.push({x: x1, y: y, image: treeImage})
                             stateRef.current.actors.push({x: x2, y: y, image: treeImage})
 
