@@ -1,10 +1,12 @@
 import React, { MutableRefObject, useEffect, useRef } from "react";
 import Car from "../icons/Car";
 import { svgToRaster } from "../utils/svgToRaster";
+import Tree from "src/icons/Tree";
 
 const FPS = 60;
 const FRAME_INTERVAL = 1000 / FPS;
 
+const ROAD_WIDTH = 160;
 const ROAD_STRIP_GAP = 100
 const CAR_WIDTH = 50
 const CAR_LENGTH = 80
@@ -22,7 +24,13 @@ const COLORS = {
     car: "#3f7ef3"
 }
 
-
+interface Actor {
+    x: number;
+    y: number;
+    dx?: number;
+    dy?: number;
+    image: HTMLCanvasElement | null;
+}
 
 const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rotation }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,6 +40,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         x: width/2 - CAR_WIDTH/2, 
         y: height - 150, 
         roadYOffset: 0,
+        speedY: 4,
         // Car rotation in radians
         angle: 0,
         // Points reperesenting the car
@@ -39,6 +48,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         p2: {x: 0, y: 0},
         p3: {x: 0, y: 0},
         p4: {x: 0, y: 0},
+
+        actors: [] as Actor[],
     });
 
     useEffect(() => {
@@ -61,6 +72,38 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         svgToRaster(<Car fill={COLORS.car} />, CAR_WIDTH * dpr, CAR_LENGTH * dpr)
             .then((img) => { if (!cancelled) carImage = img; })
             .catch((err) => console.error(err));
+        
+        const roadLeftBound = width/2 - ROAD_WIDTH/2 - 60;
+        const roadRightBound = width/2 + ROAD_WIDTH/2 ;
+
+        let treeImage: HTMLCanvasElement | null = null;
+        svgToRaster(<Tree />, 80, 80)
+            .then((img) => { 
+                if (!cancelled)
+                    {
+                        treeImage = img;
+                        
+                        for (let j = 0; j < 10; j++)
+                        {
+                            let x1 = Math.floor(Math.random() * (roadLeftBound + 1));
+                            let x2 = Math.floor(Math.random() * (width - roadRightBound -50)) + roadRightBound;
+                            let y = width/10 * j;
+                            stateRef.current.actors.push({x: x1, y: y, image: treeImage})
+                            stateRef.current.actors.push({x: x2, y: y, image: treeImage})
+
+                            if (j % 3 == 0)
+                            {
+                                stateRef.current.actors.push({x: x1-100, y: y-10, image: treeImage})
+                            }
+                            if (j % 3 == 1)
+                            {
+                                stateRef.current.actors.push({x: x2+100, y: y-10, image: treeImage})
+                            }
+                        }
+                    } 
+                 })
+            .catch((err) => console.error(err));
+        
 
         const update = () => {
             const s = stateRef.current;
@@ -93,9 +136,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             s.p4 = rot(s.x, s.y + CAR_LENGTH);
 
             // Move background
-            s.roadYOffset += 4;
+            s.roadYOffset += s.speedY;
             if (s.roadYOffset > height)
                 s.roadYOffset = s.roadYOffset % ROAD_STRIP_GAP;
+
+            for (let actor of s.actors)
+            {
+                actor.y += s.speedY;
+                if (actor.y > height)
+                    actor.y = -100;
+            }
         };
 
         const draw = () => {
@@ -106,13 +156,24 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             ctx.fillStyle = COLORS.grass;
             ctx.fillRect(0, 0, width, height);
             ctx.fillStyle = "white";
-            ctx.fillRect(width/2 - 85, 0, 170, height);
+            ctx.fillRect(width/2 - (ROAD_WIDTH/2+5), 0, ROAD_WIDTH+10, height);
             ctx.fillStyle = COLORS.road;
-            ctx.fillRect(width/2 - 80, 0, 160, height);
+            ctx.fillRect(width/2 - ROAD_WIDTH/2, 0, ROAD_WIDTH, height);
             ctx.fillStyle = COLORS.roadStripes;
             for (let i = 0; i < 20; i++)
             {
                 ctx.fillRect(width/2 -2.5, i * ROAD_STRIP_GAP + s.roadYOffset - height, 5, 25);
+            }
+
+            // Trees
+            for (let actor of s.actors)
+            {   
+                if (actor.image)
+                {
+                    ctx.save();
+                    ctx.drawImage(actor.image, actor.x, actor.y);
+                    ctx.restore();
+                }
             }
             
             // Car
