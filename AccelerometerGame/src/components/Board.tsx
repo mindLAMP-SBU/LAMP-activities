@@ -247,7 +247,8 @@ const Board: React.FC<Props> = ({ data }) => {
 
       {/* Playing — the activity's own UI goes here. */}
       {phase === "playing" && (
-        <div className="activity-area">
+        // Tapping the game re-centres steering, clearing any accumulated gyro drift
+        <div className="activity-area" onPointerDown={() => { theta.current = 0; }}>
           {orientationLock.size && (
             <GameCanvas
               rotation={theta}
