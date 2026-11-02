@@ -14,6 +14,16 @@ const resources = {
         "Pass the car in front of you, but only cross the centre line where it is dashed, never over a double yellow line. " +
         "Watch out for oncoming cars, and don't hit any cars or trees.",
       WARNING_DOUBLE_YELLOW: "No passing on a double yellow line!",
+      SUMMARY: "Summary",
+      PASSES: "Passes",
+      ILLEGAL_CROSSINGS: "Illegal crossings",
+      DURATION: "Duration",
+      SUMMARY_COMPLETE: "Great driving! You completed every pass.",
+      SUMMARY_CRASH_LEAD: "You crashed into the car in front of you.",
+      SUMMARY_CRASH_ONCOMING: "You crashed into an oncoming car.",
+      SUMMARY_CRASH_TREE: "You crashed into a tree.",
+      SUMMARY_TIP_DOUBLE_YELLOW: "Tip: only pass where the centre line is dashed, never over a double yellow line.",
+      Continue: "Continue",
       GAME_OVER: "Game Over",
       PERMISSION: "Grant accelerometer permission",
       PERMISSION_DENIED:

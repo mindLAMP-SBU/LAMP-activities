@@ -7,6 +7,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { InstructionModal } from "./InstructionModal";
 import { Questionnaire } from "./Questionnaire";
+import { Summary } from "./Summary";
 import useDeviceMotion, { MotionSample } from "../hooks/useDeviceMotion";
 import i18n from "../i18n";
 import "./Board.css";
@@ -37,7 +38,7 @@ const integrateAngle = (angle: number, rate: number, dt: number) => {
 };
 
 // Activity-specific phases go between "playing" and "questionnaire".
-type Phase = "instructions" | "playing" | "questionnaire" | "done";
+type Phase = "instructions" | "playing" | "summary" | "questionnaire" | "done";
 
 interface Props {
   data: any;
@@ -63,6 +64,7 @@ const Board: React.FC<Props> = ({ data }) => {
   const startedAtRef = useRef(0);
   const eventsRef = useRef<GameEvent[]>([]);
   const resultRef = useRef<GameResult | null>(null);
+  const endedAtRef = useRef(0);
   const theta = useRef(0);
   // Forward/back tilt in degrees relative to how the phone was held at start
   // (positive = tilted forward). Derived from gravity, so it doesn't drift.
@@ -147,6 +149,7 @@ const Board: React.FC<Props> = ({ data }) => {
     pitch.current = 0;
     eventsRef.current = [];
     resultRef.current = null;
+    endedAtRef.current = 0;
     pitchCalibRef.current = { filtered: null, neutral: null, startedAt: 0, sign: 1 };
     motion.requestPermission();
     tryNativeLock();
@@ -164,8 +167,9 @@ const Board: React.FC<Props> = ({ data }) => {
 
   const handleGameOver = useCallback((result: GameResult) => {
     resultRef.current = result;
-    finishActivity();
-  }, [finishActivity]);
+    endedAtRef.current = Date.now();
+    setPhase("summary");
+  }, []);
 
   // send results via mindlamp api
   const sendResults = useCallback(
@@ -260,6 +264,20 @@ const Board: React.FC<Props> = ({ data }) => {
               onGameOver={handleGameOver}
             />
           )}
+        </div>
+      )}
+
+      {/* Summary */}
+      {phase === "summary" && resultRef.current && (
+        <div className="activity-area">
+          <Summary
+            passes={resultRef.current.passes}
+            rounds={rounds}
+            illegalCrossings={resultRef.current.violations}
+            durationMs={endedAtRef.current - startedAtRef.current}
+            reason={resultRef.current.reason}
+            onContinue={finishActivity}
+          />
         </div>
       )}
 

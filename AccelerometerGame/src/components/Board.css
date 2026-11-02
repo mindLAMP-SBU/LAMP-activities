@@ -301,3 +301,49 @@
     font-size: 16px;
   }
 }
+
+/* ── Summary ────────────────────────────────────── */
+.summary-outcome {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 12px;
+}
+
+.summary-stat {
+  flex: 1 1 0;
+  min-width: 110px;
+  text-align: center;
+  background: #f0f2f5;
+  border-radius: 12px;
+  padding: 12px 8px;
+}
+
+.summary-stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #D52027;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #777;
+}
+
+.summary-tip {
+  margin-top: 16px;
+  font-size: 15px;
+  color: #555;
+  text-align: center;
+}
