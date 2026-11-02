@@ -240,7 +240,6 @@ const Board: React.FC<Props> = ({ data }) => {
         <InstructionModal
           show={true}
           modalClose={handleInstructionClose}
-          msg={i18n.t("INSTRUCTIONS")}
           language={language}
         />
       )}

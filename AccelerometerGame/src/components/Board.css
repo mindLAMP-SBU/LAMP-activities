@@ -88,7 +88,7 @@
 }
 .instruction-modal-footer {
   border-top: none;
-  justify-content: center;
+  justify-content: center !important;
   padding: 8px 20px 20px;
 }
 .instruction-modal-btn {
