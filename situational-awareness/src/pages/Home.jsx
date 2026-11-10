@@ -4,7 +4,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useContext } from "react";
 import { ScoreContext } from "../context/ScoreContext";
 
-const modules = ["Module One", "Module Two", "Module Three", "Module Four", "Module Five"];
+const modules = ["Module One", "Module Two", "Module Three"];
 
 export default function Home() {
     const {score} = useContext(ScoreContext);
