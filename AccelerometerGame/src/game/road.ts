@@ -11,22 +11,28 @@ export interface LineZone {
     type: LineType;
 }
 
-const DOUBLE_LENGTH: [number, number] = [400, 900];
-const DASHED_LENGTH: [number, number] = [900, 1500];
+/** Length ranges (world distance) for each kind of section. */
+export interface ZoneLengths {
+    doubleLength: [number, number];
+    dashedLength: [number, number];
+}
 
 const randBetween = ([min, max]: [number, number]) => min + Math.random() * (max - min);
 
 /** Start with a double yellow section ending somewhere ahead of z0, so the player has to wait to pass. */
-export const createZones = (z0: number): LineZone[] => [
-    { start: -Infinity, end: z0 + randBetween(DOUBLE_LENGTH), type: "double" },
+export const createZones = (z0: number, doubleLength: [number, number]): LineZone[] => [
+    { start: -Infinity, end: z0 + randBetween(doubleLength), type: "double" },
 ];
 
-/** Append alternating sections until the markings reach `upTo`, and drop sections that end before `from`. */
-export function updateZones(zones: LineZone[], from: number, upTo: number): void {
+/**
+ * Append alternating sections until the markings reach `upTo`, and drop sections that end before `from`.
+ * New sections use `lengths`; sections already generated keep the lengths they were made with.
+ */
+export function updateZones(zones: LineZone[], from: number, upTo: number, lengths: ZoneLengths): void {
     while (zones[zones.length - 1].end < upTo) {
         const last = zones[zones.length - 1];
         const type: LineType = last.type === "double" ? "dashed" : "double";
-        const length = randBetween(type === "double" ? DOUBLE_LENGTH : DASHED_LENGTH);
+        const length = randBetween(type === "double" ? lengths.doubleLength : lengths.dashedLength);
         zones.push({ start: last.end, end: last.end + length, type });
     }
     while (zones.length > 1 && zones[0].end < from) {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowLeft,
@@ -12,6 +12,7 @@ import useDeviceMotion, { MotionSample } from "../hooks/useDeviceMotion";
 import i18n from "../i18n";
 import "./Board.css";
 import GameCanvas, { GameEvent, GameResult } from "./GameCanvas";
+import { buildRounds } from "../game/rounds";
 import useOrientationLock, { getScreenAngle, tryNativeLock } from "../hooks/useOrientationLock";
 
 
@@ -56,8 +57,10 @@ const Board: React.FC<Props> = ({ data }) => {
   const language =
     settings.current.language ?? data.configuration?.language ?? data.language ?? "en-US";
 
-  // Number of successful passes that completes the game
-  const rounds: number = settings.current.rounds ?? 3;
+  // Number of rounds in the game, and the rounds the gameplay loop plays through in order
+  const roundCount: number = settings.current.rounds ?? 3;
+  const rounds = useMemo(() => buildRounds(roundCount), [roundCount]);
+  // TODO: temporary. Replace roundCount in settings with full round object. 
 
   // state
   const [phase, setPhase] = useState<Phase>("instructions");
@@ -261,7 +264,7 @@ const Board: React.FC<Props> = ({ data }) => {
         done: true,
         static_data: {
           duration,
-          rounds,
+          rounds: roundCount,
           passes: result?.passes ?? 0,
           illegal_crossings: result?.violations ?? 0,
           crashed: crashWith !== null,
@@ -274,7 +277,7 @@ const Board: React.FC<Props> = ({ data }) => {
         ],
       });
     },
-    [post, rounds]
+    [post, roundCount]
   );
 
   
@@ -332,7 +335,7 @@ const Board: React.FC<Props> = ({ data }) => {
         <div className="activity-area">
           <Summary
             passes={resultRef.current.passes}
-            rounds={rounds}
+            rounds={roundCount}
             illegalCrossings={resultRef.current.violations}
             durationMs={endedAtRef.current - startedAtRef.current}
             reason={resultRef.current.reason}

@@ -4,6 +4,7 @@ import { svgToRaster } from "../utils/svgToRaster";
 import Tree from "src/icons/Tree";
 import { Point, polygonsIntersect, rectPoints } from "../game/collision";
 import { createZones, drawCenterLine, isDoubleBetween, LineZone, updateZones } from "../game/road";
+import { Round, RoundType } from "../game/rounds";
 
 const FPS = 60;
 const FRAME_INTERVAL = 1000 / FPS;
@@ -27,7 +28,6 @@ const MAX_TILT_DEG = 25
 const SPEED_EASE = 0.05 // Fraction of the gap to the target speed closed each frame (car inertia)
 
 // Traffic tuning
-const LEAD_SPEED = 1.2 // Slightly slower than BASE_SPEED so the player catches up
 const ONCOMING_SPEED = -1.0
 const ONCOMING_INTERVAL_FRAMES: [number, number] = [3 * FPS, 8 * FPS]
 const PASS_MARGIN = 10 // How far past the lead car the player must be to count a pass
@@ -54,8 +54,8 @@ interface GameCanvasProps {
     height?: number;
     rotation: MutableRefObject<number>;
     pitch: MutableRefObject<number>;
-    /** Number of successful passes that completes the game. */
-    rounds: number;
+    /** Rounds played in order; the game completes after the last one. */
+    rounds: Round[];
     /** Shown in the bottom-right while the player is over a double yellow line. */
     warningText: string;
     onEvent?: (event: GameEvent) => void;
@@ -142,6 +142,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             zones: [] as LineZone[],
             framesUntilOncoming: randBetween(ONCOMING_INTERVAL_FRAMES),
 
+            roundIndex: 0,
             passes: 0,
             violations: 0,
             illegal: false,
@@ -154,11 +155,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
         // World distance at the top of the screen
         const zTop = () => s.distance + s.y;
 
-        s.zones = createZones(s.distance);
-        s.cars.push({ kind: "lead", x: rightLaneX, z: s.distance + height * 0.6, speed: LEAD_SPEED });
+        const currentRound = () => roundsRef.current[s.roundIndex];
 
         const emit = (type: GameEventType, detail?: string) => {
-            onEventRef.current?.({ type, t: Date.now(), round: s.passes + 1, detail });
+            onEventRef.current?.({ type, t: Date.now(), round: s.roundIndex + 1, detail });
         };
 
         const endGame = (reason: GameOverReason) => {
@@ -167,6 +167,31 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             s.illegal = false;
             if (reason !== "complete") emit("crash", reason);
         };
+
+        // Set up whatever the round needs on the road when it begins
+        const startRound = (index: number) => {
+            s.roundIndex = index;
+            const round = currentRound();
+            switch (round.type) {
+                case RoundType.Pass: {
+                    // The first lead car starts on screen; later ones appear just above it
+                    const z = index === 0 ? s.distance + height * 0.6 : zTop() + CAR_LENGTH + 20;
+                    s.cars.push({ kind: "lead", x: rightLaneX, z, speed: round.leadSpeed });
+                    break;
+                }
+            }
+        };
+
+        // Move to the next round, or finish the game after the last one
+        const completeRound = () => {
+            if (s.roundIndex + 1 >= roundsRef.current.length)
+                endGame("complete");
+            else
+                startRound(s.roundIndex + 1);
+        };
+
+        s.zones = createZones(s.distance, currentRound().doubleLength);
+        startRound(0);
 
         // Assets
         const images: Record<"player" | "lead" | "oncoming", HTMLCanvasElement | null> = {
@@ -255,7 +280,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
 
             // Move world
             s.distance += s.speedY;
-            updateZones(s.zones, s.distance - height, zTop() + height);
+            updateZones(s.zones, s.distance - height, zTop() + height, currentRound());
 
             for (let actor of s.environmentActors)
             {
@@ -307,7 +332,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             }
             s.illegal = illegal;
 
-            // A pass counts once the player is ahead of the lead car and back in their own lane
+            // Round-specific objective
+            switch (currentRound().type) {
+                case RoundType.Pass:
+                    updatePassRound(playerPoly);
+                    break;
+            }
+        };
+
+        // A pass counts once the player is ahead of the lead car and back in their own lane
+        const updatePassRound = (playerPoly: Point[]) => {
             const lead = s.cars.find((car) => car.kind === "lead" && !car.passed);
             const inOwnLane = playerPoly.every((pt) => pt.x > centerX);
             if (lead && inOwnLane && s.distance - CAR_LENGTH > lead.z + PASS_MARGIN)
@@ -315,12 +349,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
                 lead.passed = true;
                 emit("pass");
                 s.passes += 1;
-                if (s.passes >= roundsRef.current)
-                {
-                    endGame("complete");
-                    return;
-                }
-                s.cars.push({ kind: "lead", x: rightLaneX, z: zTop() + CAR_LENGTH + 20, speed: LEAD_SPEED });
+                completeRound();
             }
         };
 
@@ -396,7 +425,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             ctx.font = "bold 14px sans-serif";
             ctx.textBaseline = "top";
             ctx.fillStyle = "white";
-            ctx.fillText(`${s.passes}/${roundsRef.current}`, 10, 10);
+            ctx.fillText(`${s.passes}/${roundsRef.current.length}`, 10, 10);
 
             if (s.illegal)
                 drawWarning(warningTextRef.current);
