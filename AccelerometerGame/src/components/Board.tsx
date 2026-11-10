@@ -11,7 +11,6 @@ import { Summary } from "./Summary";
 import useDeviceMotion, { MotionSample } from "../hooks/useDeviceMotion";
 import i18n from "../i18n";
 import "./Board.css";
-import Arrow from "src/icons/Arrow";
 import GameCanvas, { GameEvent, GameResult } from "./GameCanvas";
 import useOrientationLock, { getScreenAngle, tryNativeLock } from "../hooks/useOrientationLock";
 
@@ -23,6 +22,9 @@ const MAX_STEP_MS = 250;
 const PITCH_SMOOTHING = 0.15;
 /** How long the phone's starting pitch is sampled to define "neutral", in ms. */
 const PITCH_CALIBRATION_MS = 500;
+
+/** If no real motion data arrives within this long after play starts, treat devicemotion as failed. */
+const MOTION_TIMEOUT_MS = 1000;
 
 /** Wrap an angle in degrees to [-180, 180). */
 const wrap180 = (deg: number) => ((deg + 180) % 360 + 360) % 360 - 180;
@@ -59,6 +61,8 @@ const Board: React.FC<Props> = ({ data }) => {
 
   // state
   const [phase, setPhase] = useState<Phase>("instructions");
+  // True once devicemotion is known not to work this session (unsupported, denied, or no data)
+  const [motionFailed, setMotionFailed] = useState(false);
 
   // refs
   const startedAtRef = useRef(0);
@@ -79,6 +83,29 @@ const Board: React.FC<Props> = ({ data }) => {
   const seenRef = useRef(0);
   const appliedRef = useRef(0);
   const lastDtRef = useRef(0);
+  // Set once any sample carries real numbers in the fields the game uses
+  const gotMotionRef = useRef(false);
+
+  // Runs once when devicemotion has failed. For desktop testing
+  const runFallback = () => {
+    // replaces gyro control with mouse controls
+    let mousePos = { x: 0, y: 0 };
+    const center = { x: window.innerWidth/2, y: window.innerHeight/2}
+    const handleMouseMove = (event: MouseEvent): void => {
+      mousePos = {
+        x: event.clientX,
+        y: event.clientY
+      };
+      console.log(`Center offset -> X: ${mousePos.x - center.x}, Y: ${mousePos.y + center.y}`);
+
+      let xAngle = -Math.atan2(mousePos.y - 2*center.y, mousePos.x - center.x) * (180 / Math.PI) -90;
+      console.log(xAngle);
+
+      theta.current = xAngle;
+    }; 
+
+    window.addEventListener('mousemove', handleMouseMove);
+  };
 
   // Low-pass filter the gravity vector into a pitch angle, relative to the calibrated neutral
   const updatePitch = useCallback((s: MotionSample) => {
@@ -107,6 +134,14 @@ const Board: React.FC<Props> = ({ data }) => {
     updatePitch(s);
 
     const gamma = s.rotationRate.gamma;
+    if (
+      !gotMotionRef.current &&
+      (gamma !== null ||
+        s.accelerationIncludingGravity.x !== null ||
+        s.accelerationIncludingGravity.z !== null)
+    ) {
+      gotMotionRef.current = true;
+    }
     const prevT = lastSampleAtRef.current;
     lastSampleAtRef.current = s.t;
     seenRef.current += 1;
@@ -130,6 +165,29 @@ const Board: React.FC<Props> = ({ data }) => {
   // Keep the view fixed to the device if the OS rotates the screen mid-game
   const orientationLock = useOrientationLock(phase === "playing");
 
+  // Decide whether devicemotion has failed: unsupported, denied, or granted but silent
+  useEffect(() => {
+    if (phase !== "playing") return undefined;
+    if (motion.permission === "unsupported" || motion.permission === "denied") {
+      setMotionFailed(true);
+      return undefined;
+    }
+    // "prompt": the iOS dialog is still open; re-run once permission resolves
+    if (motion.permission !== "granted") return undefined;
+    const id = window.setTimeout(() => {
+      if (!gotMotionRef.current) setMotionFailed(true);
+    }, MOTION_TIMEOUT_MS);
+    return () => {
+      window.clearTimeout(id);
+    };
+  }, [phase, motion.permission]);
+
+  // Run the fallback once when devicemotion is found to be unavailable
+  useEffect(() => {
+    if (phase !== "playing" || !motionFailed) return;
+    runFallback();
+  }, [phase, motionFailed]);
+
   // localization
   useEffect(() => {
     i18n.changeLanguage(language);
@@ -151,6 +209,8 @@ const Board: React.FC<Props> = ({ data }) => {
     resultRef.current = null;
     endedAtRef.current = 0;
     pitchCalibRef.current = { filtered: null, neutral: null, startedAt: 0, sign: 1 };
+    gotMotionRef.current = false;
+    setMotionFailed(false);
     motion.requestPermission();
     tryNativeLock();
     setPhase("playing");
