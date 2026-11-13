@@ -294,14 +294,6 @@ const Board: React.FC<Props> = ({ data }) => {
           <FontAwesomeIcon icon={faArrowLeft} />
         </span>
         {i18n.t("GAME")}
-        {data.forward === true && (
-          <span
-            className="home-link-forward"
-            onClick={() => post({ forward: true })}
-          >
-            <FontAwesomeIcon icon={faArrowRight} />
-          </span>
-        )}
         <span className="home-link" onClick={() => post({ clickBack: true })}>
           <FontAwesomeIcon icon={faHome} />
         </span>
