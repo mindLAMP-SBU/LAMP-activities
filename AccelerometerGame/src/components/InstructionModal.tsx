@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Button, Modal } from "react-bootstrap";
 import i18n from "../i18n";
+import RotatePhone from "../icons/RotatePhone";
 
 interface Props {
   show: boolean;
@@ -46,7 +47,12 @@ export class InstructionModal extends React.Component<Props, State> {
         <Modal.Body className="instruction-modal-body">
           {
             this.state.page == 0 ?
-              i18n.t("INSTRUCTIONS") :
+              (
+                <>
+                  <div className="instruction-graphic"><RotatePhone /></div>
+                  {i18n.t("INSTRUCTIONS")}
+                </>
+              ) :
               i18n.t("INSTRUCTIONS_2")
           }
         </Modal.Body>
