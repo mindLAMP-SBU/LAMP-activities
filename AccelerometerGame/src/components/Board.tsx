@@ -11,7 +11,7 @@ import { Summary } from "./Summary";
 import useDeviceMotion, { MotionSample } from "../hooks/useDeviceMotion";
 import i18n from "../i18n";
 import "./Board.css";
-import GameCanvas, { GameEvent, GameResult } from "./GameCanvas";
+import GameCanvas, { GameEvent, GameResult, MAX_TILT_DEG } from "./GameCanvas";
 import { buildRounds } from "../game/rounds";
 import useOrientationLock, { getScreenAngle, tryNativeLock } from "../hooks/useOrientationLock";
 
@@ -105,7 +105,12 @@ const Board: React.FC<Props> = ({ data }) => {
       console.log(xAngle);
 
       theta.current = xAngle;
-    }; 
+
+      // Vertical position sets speed: middle = normal, top = fastest, bottom = slowest
+      const halfH = window.innerHeight / 2;
+      const offset = (halfH - event.clientY) / halfH; // +1 at the top, -1 at the bottom
+      pitch.current = Math.max(-1, Math.min(1, offset)) * MAX_TILT_DEG;
+    };
 
     window.addEventListener('mousemove', handleMouseMove);
   };

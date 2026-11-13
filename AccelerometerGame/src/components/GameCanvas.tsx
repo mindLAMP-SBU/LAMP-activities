@@ -25,7 +25,7 @@ const MIN_SPEED = 0.75
 const BASE_SPEED = 1.5
 const MAX_SPEED = 3.5
 const DEAD_ZONE_DEG = 4
-const MAX_TILT_DEG = 25
+export const MAX_TILT_DEG = 25
 const SPEED_EASE = 0.05 // Fraction of the gap to the target speed closed each frame (car inertia)
 
 // Traffic tuning
