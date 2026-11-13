@@ -11,13 +11,16 @@ const resources = {
       INSTRUCTIONS:
         "Rotate your phone into the landscape position before pressing start. ",
       INSTRUCTIONS_2: "Rotate your phone to steer, and tilt it forward or back to speed up or slow down. " +
-        "Pass the car in front of you, but only cross the centre line where it is dashed, never over a double yellow line. ",
+        "Pass the car in front of you, but only cross the centre line where it is dashed, never over a double yellow line. " +
+        "On winding stretches, steer to keep your car in the middle of your lane.",
       WARNING_DOUBLE_YELLOW: "No passing on a double yellow line!",
+      WINDING_HINT: "Winding road! Stay in the middle of your lane",
+      ROUNDS: "Rounds",
       SUMMARY: "Summary",
       PASSES: "Passes",
       ILLEGAL_CROSSINGS: "Illegal crossings",
       DURATION: "Duration",
-      SUMMARY_COMPLETE: "Great driving! You completed every pass.",
+      SUMMARY_COMPLETE: "Great driving! You completed every round.",
       SUMMARY_CRASH_LEAD: "You crashed into the car in front of you.",
       SUMMARY_CRASH_ONCOMING: "You crashed into an oncoming car.",
       SUMMARY_CRASH_TREE: "You crashed into a tree.",

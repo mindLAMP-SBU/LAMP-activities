@@ -252,10 +252,11 @@ const Board: React.FC<Props> = ({ data }) => {
       // One slice per gameplay event; duration is the time since the previous event
       let prevT = startedAtRef.current;
       const slices = eventsRef.current.map((e) => {
+        // Winding rounds report lane-keeping: value = mean deviation (px), type = time off road
         const slice = {
           item: e.type,
-          type: e.detail ?? null,
-          value: e.round,
+          type: e.stats ? `off_road_ms:${Math.round(e.stats.offRoadMs)}` : e.detail ?? null,
+          value: e.stats ? e.stats.meanDeviation : e.round,
           level: e.round,
           duration: prevT ? e.t - prevT : 0,
         };
@@ -270,7 +271,9 @@ const Board: React.FC<Props> = ({ data }) => {
         static_data: {
           duration,
           rounds: roundCount,
+          rounds_completed: result?.roundsCompleted ?? 0,
           passes: result?.passes ?? 0,
+          winding: result?.winding ?? [],
           illegal_crossings: result?.violations ?? 0,
           crashed: crashWith !== null,
           crash_with: crashWith,
@@ -320,6 +323,7 @@ const Board: React.FC<Props> = ({ data }) => {
               width={orientationLock.size.w}
               rounds={rounds}
               warningText={i18n.t("WARNING_DOUBLE_YELLOW")}
+              windingHintText={i18n.t("WINDING_HINT")}
               onEvent={handleGameEvent}
               onGameOver={handleGameOver}
             />
@@ -331,7 +335,7 @@ const Board: React.FC<Props> = ({ data }) => {
       {phase === "summary" && resultRef.current && (
         <div className="activity-area">
           <Summary
-            passes={resultRef.current.passes}
+            roundsCompleted={resultRef.current.roundsCompleted}
             rounds={roundCount}
             illegalCrossings={resultRef.current.violations}
             durationMs={endedAtRef.current - startedAtRef.current}

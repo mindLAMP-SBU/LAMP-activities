@@ -4,7 +4,7 @@ import i18n from "../i18n";
 import { GameOverReason } from "./GameCanvas";
 
 interface Props {
-  passes: number;
+  roundsCompleted: number;
   rounds: number;
   illegalCrossings: number;
   durationMs: number;
@@ -28,7 +28,7 @@ const formatDuration = (ms: number) => {
 };
 
 /** End-of-game feedback shown before the questionnaire. */
-export const Summary: React.FC<Props> = ({ passes, rounds, illegalCrossings, durationMs, reason, onContinue }) => (
+export const Summary: React.FC<Props> = ({ roundsCompleted, rounds, illegalCrossings, durationMs, reason, onContinue }) => (
   <Modal
     show={true}
     animation={false}
@@ -46,8 +46,8 @@ export const Summary: React.FC<Props> = ({ passes, rounds, illegalCrossings, dur
       <div className="summary-outcome">{i18n.t(OUTCOME_KEYS[reason])}</div>
       <div className="summary-stats">
         <div className="summary-stat">
-          <div className="summary-stat-value">{passes} / {rounds}</div>
-          <div className="summary-stat-label">{i18n.t("PASSES")}</div>
+          <div className="summary-stat-value">{roundsCompleted} / {rounds}</div>
+          <div className="summary-stat-label">{i18n.t("ROUNDS")}</div>
         </div>
         <div className="summary-stat">
           <div className="summary-stat-value">{illegalCrossings}</div>

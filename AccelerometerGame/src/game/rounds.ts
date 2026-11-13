@@ -6,6 +6,18 @@
 export enum RoundType {
     /** Catch up to a slower lead car and pass it on a dashed section. */
     Pass = "pass",
+    /** Follow a winding stretch of road, keeping to the middle of the right lane. */
+    Winding = "winding",
+}
+
+/** Shape of a winding stretch of road. */
+export interface CurveParams {
+    /** Largest sideways shift of the road, in px. */
+    amplitude: number;
+    /** World distance of one full left-and-right bend. */
+    wavelength: number;
+    /** World distance of the whole winding stretch (the length of the round). */
+    length: number;
 }
 
 export interface Round {
@@ -14,8 +26,10 @@ export interface Round {
     doubleLength: [number, number];
     /** World-distance range for each dashed (passing) section, randomised per section. */
     dashedLength: [number, number];
-    /** Speed of the car the player has to pass. */
+    /** Speed of the car the player has to pass. Used by Pass rounds. */
     leadSpeed: number;
+    /** Road shape. Required by Winding rounds, ignored by Pass rounds. */
+    curve?: CurveParams;
 }
 
 /** Matches the original hard-coded tuning. */
@@ -26,6 +40,15 @@ export const DEFAULT_ROUND: Round = {
     leadSpeed: 1.2, // Slightly slower than BASE_SPEED so the player catches up
 };
 
-/** `count` copies of the default round. */
+/** No passing on bends: dashed sections have zero length, so the centre line is all double yellow. */
+export const WINDING_ROUND: Round = {
+    type: RoundType.Winding,
+    doubleLength: [400, 900],
+    dashedLength: [0, 0],
+    leadSpeed: 1.2,
+    curve: { amplitude: 50, wavelength: 800, length: 2400 },
+};
+
+/** `count` rounds alternating Pass, Winding, Pass, ... */
 export const buildRounds = (count: number): Round[] =>
-    Array.from({ length: count }, () => ({ ...DEFAULT_ROUND }));
+    Array.from({ length: count }, (_, i) => ({ ...(i % 2 === 0 ? DEFAULT_ROUND : WINDING_ROUND) }));

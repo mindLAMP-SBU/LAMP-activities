@@ -44,11 +44,56 @@ export function updateZones(zones: LineZone[], from: number, upTo: number, lengt
 export const isDoubleBetween = (zones: LineZone[], from: number, to: number): boolean =>
     zones.some((z) => z.type === "double" && z.start < to && z.end > from);
 
-/** Draw the centre line between world distances zBottom and zTop. */
+/** A winding stretch of road between world distances `start` and `end`. */
+export interface Curve {
+    start: number;
+    end: number;
+    amplitude: number;
+    wavelength: number;
+}
+
+/**
+ * Sideways shift of the road centre at world distance z. The sin(pi*u) envelope
+ * eases each bend in and out, so the road is exactly straight at both ends.
+ */
+export function roadOffset(curves: Curve[], z: number): number {
+    let offset = 0;
+    for (const c of curves) {
+        if (z <= c.start || z >= c.end) continue;
+        const u = (z - c.start) / (c.end - c.start);
+        offset += c.amplitude * Math.sin(Math.PI * u) * Math.sin((2 * Math.PI * (z - c.start)) / c.wavelength);
+    }
+    return offset;
+}
+
+/** World distance covered by each strip when drawing something that bends with the road. */
+export const SLICE = 3;
+
+/**
+ * Fill a strip that follows the road between world distances lo and hi, drawn as
+ * short rects so it can bend. `dx` is the strip's left edge relative to the road centre.
+ */
+export function fillAlongRoad(
+    ctx: CanvasRenderingContext2D,
+    lo: number,
+    hi: number,
+    dx: number,
+    w: number,
+    centreAt: (z: number) => number,
+    toScreenY: (z: number) => number,
+): void {
+    for (let z = lo; z < hi; z += SLICE) {
+        const z2 = Math.min(z + SLICE, hi);
+        // Half a pixel of overlap hides seams between neighbouring slices
+        ctx.fillRect(centreAt((z + z2) / 2) + dx, toScreenY(z2), w, z2 - z + 0.5);
+    }
+}
+
+/** Draw the centre line between world distances zBottom and zTop, following the road centre. */
 export function drawCenterLine(
     ctx: CanvasRenderingContext2D,
     zones: LineZone[],
-    centerX: number,
+    centreAt: (z: number) => number,
     zBottom: number,
     zTop: number,
     toScreenY: (z: number) => number,
@@ -63,15 +108,14 @@ export function drawCenterLine(
         if (hi <= lo) continue;
 
         if (zone.type === "double") {
-            const y = toScreenY(hi);
-            ctx.fillRect(centerX - 3.5, y, 2, hi - lo);
-            ctx.fillRect(centerX + 1.5, y, 2, hi - lo);
+            fillAlongRoad(ctx, lo, hi, -3.5, 2, centreAt, toScreenY);
+            fillAlongRoad(ctx, lo, hi, 1.5, 2, centreAt, toScreenY);
         } else {
             // Dashes are anchored to world distance so they scroll with the road
             for (let k = Math.ceil((lo - dashLength) / dashGap); k * dashGap < hi; k++) {
                 const dLo = Math.max(k * dashGap, lo);
                 const dHi = Math.min(k * dashGap + dashLength, hi);
-                if (dHi > dLo) ctx.fillRect(centerX - 1.25, toScreenY(dHi), 2.5, dHi - dLo);
+                if (dHi > dLo) fillAlongRoad(ctx, dLo, dHi, -1.25, 2.5, centreAt, toScreenY);
             }
         }
     }
