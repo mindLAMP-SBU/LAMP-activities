@@ -5,6 +5,7 @@ import Tree from "src/icons/Tree";
 import { Point, polygonsIntersect, rectPoints } from "../game/collision";
 import { createZones, drawCenterLine, isDoubleBetween, LineZone, updateZones } from "../game/road";
 import { Round, RoundType } from "../game/rounds";
+import { vibrate } from "../utils/haptics";
 
 const FPS = 60;
 const FRAME_INTERVAL = 1000 / FPS;
@@ -146,6 +147,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             passes: 0,
             violations: 0,
             illegal: false,
+            offRoad: false,
             over: null as GameOverReason | null,
             overAt: 0,
             reported: false,
@@ -165,6 +167,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             s.over = reason;
             s.overAt = performance.now();
             s.illegal = false;
+            s.offRoad = false;
             if (reason !== "complete") emit("crash", reason);
         };
 
@@ -331,8 +334,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             {
                 s.violations += 1;
                 emit("illegal_crossing");
+                vibrate();
             }
             s.illegal = illegal;
+
+            // Leaving the road gives a haptic tap
+            const offRoad = playerPoly.some((pt) => pt.x < centerX - ROAD_WIDTH / 2 || pt.x > centerX + ROAD_WIDTH / 2);
+            if (offRoad && !s.offRoad)
+                vibrate();
+            s.offRoad = offRoad;
 
             // Round-specific objective
             switch (currentRound().type) {
