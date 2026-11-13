@@ -292,7 +292,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ width = 640, height = 480, rota
             for (const car of s.cars)
                 car.z += car.speed;
             // Drop cars that are fully below the screen
-            s.cars = s.cars.filter((car) => toScreenY(car.z) < height);
+            s.cars = s.cars.filter((car) =>
+                (car.kind === "lead" && !car.passed) || toScreenY(car.z) < height
+            );
 
             // Oncoming traffic
             s.framesUntilOncoming -= 1;
